@@ -1,0 +1,59 @@
+name: Public beta test report
+description: Report a reproducible issue using synthetic data only
+title: "[beta] "
+labels:
+  - beta-feedback
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for testing Evermore Continuity. Do not include real chats, real persona profiles, private ledgers, credentials, or provider receipts.
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Operating system, Node.js version, and timezone.
+      placeholder: Windows 11, Node.js 22.x, Asia/Shanghai
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Installation or build
+        - v0.2 continuity engine
+        - v0.3 recovery loader
+        - Final verifier
+        - Privacy or provenance
+        - Freshness or timezone behavior
+        - Documentation
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Synthetic reproduction
+      description: Minimal commands and synthetic input needed to reproduce the issue.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected result
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual result
+    validations:
+      required: true
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy confirmation
+      options:
+        - label: I used synthetic data only and removed credentials and personal identifiers.
+          required: true

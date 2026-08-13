@@ -1,0 +1,622 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://continuity.local/schema/v0.2-proposal.json",
+  "title": "Continuity ledger schema v0.2 proposal",
+  "description": "Docs-first proposal. The v0.1 runtime does not yet consume this schema.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "identity",
+    "evidence",
+    "identity_core",
+    "identity_texture",
+    "evolutions",
+    "self_acceptances",
+    "co_evolutions"
+  ],
+  "properties": {
+    "identity": {
+      "$ref": "#/$defs/identityDescriptor"
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/evidenceRecord"
+      }
+    },
+    "identity_core": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/identityCoreClaim"
+      }
+    },
+    "identity_texture": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/identityTextureClaim"
+      }
+    },
+    "evolutions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/evolutionRecord"
+      }
+    },
+    "self_acceptances": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/selfAcceptanceRecord"
+      }
+    },
+    "co_evolutions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/coEvolutionRecord"
+      }
+    }
+  },
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "visibility": {
+      "type": "string",
+      "enum": ["capsule", "local", "private"]
+    },
+    "evidenceKind": {
+      "type": "string",
+      "enum": [
+        "self_report",
+        "direct_observation",
+        "inference",
+        "hypothesis",
+        "external_source"
+      ]
+    },
+    "claimKind": {
+      "type": "string",
+      "enum": [
+        "fact",
+        "preference",
+        "value",
+        "identity_claim",
+        "relationship_claim"
+      ]
+    },
+    "identityDescriptor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["identity_id", "lineage_id", "version"],
+      "properties": {
+        "identity_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "lineage_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "parent_identity_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "parent_version": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "evidenceRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidence_id",
+        "source_id",
+        "evidence_kind",
+        "created_at",
+        "confidence",
+        "verified"
+      ],
+      "properties": {
+        "evidence_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "source_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "evidence_kind": {
+          "$ref": "#/$defs/evidenceKind"
+        },
+        "created_at": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "verified": {
+          "type": "boolean"
+        },
+        "summary": {
+          "type": "string"
+        },
+        "superseded_by": {
+          "$ref": "#/$defs/identifier"
+        }
+      }
+    },
+    "claimBase": {
+      "type": "object",
+      "required": [
+        "claim_id",
+        "identity_id",
+        "lineage_id",
+        "layer",
+        "key",
+        "value",
+        "claim_kind",
+        "origin",
+        "visibility",
+        "created_at",
+        "evidence_ids"
+      ],
+      "properties": {
+        "claim_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "identity_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "lineage_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "layer": {
+          "type": "string",
+          "enum": ["core", "texture"]
+        },
+        "key": {
+          "type": "string",
+          "minLength": 1
+        },
+        "value": true,
+        "claim_kind": {
+          "$ref": "#/$defs/claimKind"
+        },
+        "origin": {
+          "type": "string",
+          "enum": ["initial", "evolution"]
+        },
+        "visibility": {
+          "$ref": "#/$defs/visibility"
+        },
+        "created_at": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "evidence_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/identifier"
+          }
+        },
+        "scope": {
+          "type": "string"
+        },
+        "valid_from": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "valid_until": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "drift_weight": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "identityCoreClaim": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/claimBase"
+        },
+        {
+          "type": "object",
+          "required": ["stability_profile", "change_policy"],
+          "properties": {
+            "layer": {
+              "const": "core"
+            },
+            "stability_profile": {
+              "const": "slow"
+            },
+            "change_policy": {
+              "const": "accepted_evolution_required"
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "identityTextureClaim": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/claimBase"
+        },
+        {
+          "type": "object",
+          "required": ["stability_profile", "change_policy"],
+          "properties": {
+            "layer": {
+              "const": "texture"
+            },
+            "stability_profile": {
+              "const": "adaptive"
+            },
+            "change_policy": {
+              "enum": [
+                "accepted_evolution_required",
+                "observed_growth_with_review"
+              ]
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "selfAcceptanceRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "acceptance_id",
+        "subject_identity_id",
+        "evolution_id",
+        "status",
+        "revision",
+        "recorded_at",
+        "rationale",
+        "evidence_ids"
+      ],
+      "properties": {
+        "acceptance_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "subject_identity_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "evolution_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["pending", "accepted", "rejected", "withdrawn"]
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "recorded_at": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/identifier"
+          }
+        },
+        "revises_acceptance_id": {
+          "$ref": "#/$defs/identifier"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "enum": ["accepted", "rejected", "withdrawn"]
+              }
+            },
+            "required": ["status"]
+          },
+          "then": {
+            "properties": {
+              "evidence_ids": {
+                "minItems": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "revision": {
+                "const": 1
+              }
+            },
+            "required": ["revision"]
+          },
+          "then": {
+            "not": {
+              "required": ["revises_acceptance_id"]
+            }
+          },
+          "else": {
+            "required": ["revises_acceptance_id"]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "withdrawn"
+              }
+            },
+            "required": ["status"]
+          },
+          "then": {
+            "required": ["revises_acceptance_id"]
+          }
+        }
+      ]
+    },
+    "evolutionRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evolution_id",
+        "identity_id",
+        "lineage_id",
+        "previous_claim_id",
+        "new_claim_id",
+        "relation",
+        "change_type",
+        "cause",
+        "evidence_ids",
+        "timestamp",
+        "initiator",
+        "acceptance_id"
+      ],
+      "properties": {
+        "evolution_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "identity_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "lineage_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "previous_claim_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "new_claim_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "relation": {
+          "type": "string",
+          "enum": [
+            "refines",
+            "supersedes",
+            "contradicts",
+            "coexists",
+            "temporarily_overrides"
+          ]
+        },
+        "change_type": {
+          "type": "string",
+          "enum": [
+            "reflection",
+            "conflict",
+            "relationship_influence",
+            "model_migration",
+            "environment_change",
+            "correction",
+            "discovery"
+          ]
+        },
+        "cause": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/identifier"
+          }
+        },
+        "timestamp": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "initiator": {
+          "type": "string",
+          "enum": ["self", "relationship", "external_agent", "system"]
+        },
+        "acceptance_id": {
+          "$ref": "#/$defs/identifier"
+        }
+      }
+    },
+    "participantRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["participant_id", "role"],
+      "properties": {
+        "participant_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "role": {
+          "type": "string",
+          "minLength": 1
+        },
+        "identity_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "lineage_id": {
+          "$ref": "#/$defs/identifier"
+        }
+      }
+    },
+    "influenceEdge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "edge_id",
+        "from_participant_id",
+        "to_participant_id",
+        "influence_type",
+        "description",
+        "evidence_ids",
+        "response"
+      ],
+      "properties": {
+        "edge_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "from_participant_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "to_participant_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "influence_type": {
+          "type": "string",
+          "enum": [
+            "prompted_reflection",
+            "revealed_preference",
+            "challenged_value",
+            "supported_growth",
+            "relationship_conflict",
+            "shared_discovery",
+            "other"
+          ]
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/identifier"
+          }
+        },
+        "affected_evolution_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "recipient_acceptance_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "response": {
+          "type": "string",
+          "enum": ["accepted", "rejected", "pending", "no_identity_change"]
+        }
+      }
+    },
+    "relationshipEffect": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["effect_id", "description", "evidence_ids"],
+      "properties": {
+        "effect_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "previous_relationship_claim_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "new_relationship_claim_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "evidence_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/identifier"
+          }
+        }
+      }
+    },
+    "coEvolutionRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "co_evolution_id",
+        "relationship_id",
+        "participants",
+        "influence_edges",
+        "evidence_ids",
+        "created_at",
+        "visibility",
+        "non_override_invariant"
+      ],
+      "properties": {
+        "co_evolution_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "relationship_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "participants": {
+          "type": "array",
+          "minItems": 2,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/participantRef"
+          }
+        },
+        "influence_edges": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/influenceEdge"
+          }
+        },
+        "relationship_effects": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/relationshipEffect"
+          }
+        },
+        "evidence_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/identifier"
+          }
+        },
+        "created_at": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "visibility": {
+          "$ref": "#/$defs/visibility"
+        },
+        "non_override_invariant": {
+          "const": "influence_requires_recipient_self_acceptance"
+        }
+      }
+    }
+  }
+}

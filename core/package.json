@@ -1,0 +1,25 @@
+{
+  "name": "@shenwu/continuity",
+  "version": "0.3.0-rc.1",
+  "description": "An identity continuity layer with deterministic v0.3 recovery and verification.",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "npm run build && node --test dist/tests/*.test.js",
+    "test:v02": "npm run build && node --test dist/tests/continuity.test.js",
+    "test:v03:slice1": "npm run build && node --test dist/tests/recovery-v03-slice1.test.js",
+    "test:v03:final": "npm run build && node --test dist/tests/recovery-v03-final-verifier.test.js",
+    "test:v03:release-gate": "npm run build && node --test dist/tests/recovery-v03-release-gate.test.js",
+    "test:v03": "npm run build && node --test dist/tests/recovery-v03-*.test.js",
+    "check:schema": "node scripts/validate-schema.mjs",
+    "check": "npm run test && npm run check:schema"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.9.0"
+  }
+}
