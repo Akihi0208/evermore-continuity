@@ -18,7 +18,7 @@ This repository is a **public testing preview** of the generic, synthetic-only c
 Requirements: Node.js 22 or newer.
 
 ```bash
-git clone https://github.com/Aki0208-debug/evermore-continuity.git
+git clone https://github.com/Akihi0208/evermore-continuity.git
 cd evermore-continuity/core
 npm ci
 npm run check
