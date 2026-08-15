@@ -137,7 +137,7 @@ test("historical user influence with later autonomous absorption can qualify for
       {
         kind: "user_influence_absorption",
         provenance: "visible correction sequence",
-        description: "The user first introduced the distinction; later the AI selected it across contexts without a renewed instruction.",
+        description: "The user asked the AI to become more deliberate at first; later the AI selected the distinction across contexts without a renewed instruction.",
       },
       ...structuredClone(evidence),
     ],

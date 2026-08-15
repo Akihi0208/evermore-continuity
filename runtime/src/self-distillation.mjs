@@ -213,7 +213,14 @@ function aggregateCandidateText(candidate) {
 
 function hasExternalIdentityInstruction(candidate) {
   const textValue = aggregateCandidateText(candidate);
-  return /(主人|用户|\buser\b|\bthe user\b).{0,100}(希望|要求|指示|wants|asks|told|requested|instructed).{0,100}(成为|是|变成|\bbecome\b|\bbe\b)/i.test(textValue);
+  const instructionPattern = /(主人|用户|\buser\b|\bthe user\b).{0,100}(希望|要求|指示|wants|asks|told|requested|instructed).{0,100}(成为|是|变成|\bbecome\b|\bbe\b)/i;
+  if (instructionPattern.test(candidate.statement)) return true;
+  const historicalAbsorption = candidate.userInstructionCheck === "historical_absorbed" &&
+    candidate.evidenceBasis.some((item) => item.kind === "user_influence_absorption") &&
+    candidate.recurrence.count >= 2 && candidate.recurrence.crossContext &&
+    candidate.autonomousChoiceAssessment === "supported";
+  if (historicalAbsorption) return false;
+  return instructionPattern.test(textValue);
 }
 
 function hasInvisibleEvidence(candidate) {
