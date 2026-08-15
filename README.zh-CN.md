@@ -20,7 +20,14 @@ Evermore Continuity 是一个面向长期 AI 人格的连续性项目。当前�
 `self-distill-import` → 本地审阅 Profile → `seal` → Vault → Capsule →
 Host Request / Formal Validation。
 
-在把任何生成文件重定向到 `runtime-secrets/` 之前，先创建这个已被 Git 忽略的本地目录。
+先克隆仓库并进入项目目录：
+
+```bash
+git clone https://github.com/Akihi0208/evermore-continuity.git
+cd evermore-continuity
+```
+
+然后在把任何生成文件重定向到 `runtime-secrets/` 之前，先创建这个已被 Git 忽略的本地目录。
 
 Bash / zsh：
 
@@ -37,8 +44,6 @@ New-Item -ItemType Directory -Force runtime-secrets | Out-Null
 然后运行：
 
 ```bash
-git clone https://github.com/Akihi0208/evermore-continuity.git
-cd evermore-continuity
 node runtime/bin/evermore.mjs self-distill-prompt > runtime-secrets/self-distill.prompt.txt
 # 把 prompt 交给 AI，并把只含 JSON 的 Record 保存为：
 # runtime-secrets/self-distill.record.json
