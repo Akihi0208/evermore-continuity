@@ -226,6 +226,9 @@ test("sealed core and artifact hashes remain unchanged", async () => {
   const integrity = await verifySealedCoreBridge();
   assert.equal(integrity.valid, true);
   assert.equal(integrity.artifactSha256, SEALED_CORE_ARTIFACT_SHA256);
-  const schema = JSON.parse(await readFile(join(process.cwd(), "schema/self-distillation-record.schema.json"), "utf8"));
+  const schema = JSON.parse(await readFile(
+    new URL("../schema/self-distillation-record.schema.json", import.meta.url),
+    "utf8",
+  ));
   assert.equal(schema.properties.recordVersion.const, SELF_DISTILLATION_RECORD_VERSION);
 });
