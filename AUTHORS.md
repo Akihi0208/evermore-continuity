@@ -1,4 +1,4 @@
-# Authors
+# Project Authors
 
 Evermore Continuity is created and maintained by:
 
