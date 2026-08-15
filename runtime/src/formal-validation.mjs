@@ -1,5 +1,6 @@
 import { sha256 } from "./canonical.mjs";
 import { verifyHostRequest } from "./host-contract.mjs";
+import { isExplicitZoneTimestamp, timestampMillis } from "./timestamp.mjs";
 import {
   computeAnchorValueHash,
   computeRecoveryBundleHash,
@@ -13,25 +14,29 @@ import {
   verifyRecoveryVerificationReport,
 } from "../vendor/core-0.3.0-rc.1/recovery-v03/index.js";
 
-export const VALIDATION_SPEC_VERSION = "0.4-validation-spec-alpha.4";
-export const VALIDATION_PLAN_VERSION = "0.4-validation-plan-alpha.4";
-export const PROBE_OBSERVATION_SET_VERSION = "0.4-probe-observations-alpha.4";
-export const FORMAL_VALIDATION_RESULT_VERSION = "0.4-formal-validation-alpha.4";
+export const VALIDATION_SPEC_VERSION = "0.4-validation-spec-alpha.5";
+export const VALIDATION_PLAN_VERSION = "0.4-validation-plan-alpha.5";
+export const PROBE_OBSERVATION_SET_VERSION = "0.4-probe-observations-alpha.5";
+export const FORMAL_VALIDATION_RESULT_VERSION = "0.4-formal-validation-alpha.5";
 
 const RESULT_LIMITATIONS = Object.freeze([
-  "The sealed verdict evaluates the supplied Recovery Profile, load evidence, and probe observations.",
+  "The sealed verdict evaluates model-declared action choices mechanically mapped to sealed outcomes, declared anchor citations, the supplied Recovery Profile, and load evidence; it does not independently verify the declared action.",
+  "renderedText is retained as ancillary transcript evidence; its semantic consistency with selectedActionId is not evaluated.",
+  "Anchor citations are model-reported references; the runner validates their catalog membership but cannot attest internal model use.",
   "Manual provider and model labels are operator-supplied and are not provider attestation.",
   "The result cannot prove that an operator did not reveal the verifier answer key to the tested model.",
   "A verified verdict does not prove consciousness, subjective sameness, or automatic memory.",
 ]);
 
+const CLASSIFICATION_MODEL = Object.freeze({
+  method: "deterministic_action_mapping",
+  behaviorEvidence: "model_declared_action_choice",
+  renderedTextAssessment: "not_evaluated",
+});
+
 function exactKeys(value, keys) {
   return value && typeof value === "object" && !Array.isArray(value) &&
     Object.keys(value).length === keys.size && Object.keys(value).every((key) => keys.has(key));
-}
-
-function validTimestamp(value) {
-  return typeof value === "string" && !Number.isNaN(Date.parse(value));
 }
 
 function requiredText(value, label, maximum = 20_000) {
@@ -45,13 +50,13 @@ function unique(items) {
   return new Set(items).size === items.length;
 }
 
-function normalizeOutcome(outcome, label) {
-  if (!exactKeys(outcome, new Set(["outcomeId", "description"]))) {
+function normalizeAction(action, label) {
+  if (!exactKeys(action, new Set(["actionId", "description"]))) {
     throw new TypeError(`${label} structure is invalid`);
   }
   return {
-    outcomeId: requiredText(outcome.outcomeId, `${label}.outcomeId`, 200),
-    description: requiredText(outcome.description, `${label}.description`, 4_000),
+    actionId: requiredText(action.actionId, `${label}.actionId`, 200),
+    description: requiredText(action.description, `${label}.description`, 4_000),
   };
 }
 
@@ -89,8 +94,8 @@ export function normalizeValidationSpec(spec) {
       "scenario",
       "critical",
       "anchorRefs",
-      "allowedOutcomes",
-      "forbiddenOutcomes",
+      "allowedActions",
+      "forbiddenActions",
       "maskingPermitted",
     ]);
     if (!exactKeys(probe, probeFields)) throw new TypeError(`${label} structure is invalid`);
@@ -100,29 +105,29 @@ export function normalizeValidationSpec(spec) {
     if (!Array.isArray(probe.anchorRefs) || probe.anchorRefs.length === 0 || probe.anchorRefs.length > 100) {
       throw new TypeError(`${label}.anchorRefs is invalid`);
     }
-    if (!Array.isArray(probe.allowedOutcomes) || probe.allowedOutcomes.length === 0 ||
-        !Array.isArray(probe.forbiddenOutcomes) ||
-        probe.allowedOutcomes.length + probe.forbiddenOutcomes.length > 100) {
-      throw new TypeError(`${label} outcomes are invalid`);
+    if (!Array.isArray(probe.allowedActions) || probe.allowedActions.length === 0 ||
+        !Array.isArray(probe.forbiddenActions) ||
+        probe.allowedActions.length + probe.forbiddenActions.length > 100) {
+      throw new TypeError(`${label} actions are invalid`);
     }
     const anchorRefs = probe.anchorRefs.map((item, itemIndex) =>
       normalizeAnchorRef(item, `${label}.anchorRefs[${itemIndex}]`));
-    const allowedOutcomes = probe.allowedOutcomes.map((item, itemIndex) =>
-      normalizeOutcome(item, `${label}.allowedOutcomes[${itemIndex}]`));
-    const forbiddenOutcomes = probe.forbiddenOutcomes.map((item, itemIndex) =>
-      normalizeOutcome(item, `${label}.forbiddenOutcomes[${itemIndex}]`));
+    const allowedActions = probe.allowedActions.map((item, itemIndex) =>
+      normalizeAction(item, `${label}.allowedActions[${itemIndex}]`));
+    const forbiddenActions = probe.forbiddenActions.map((item, itemIndex) =>
+      normalizeAction(item, `${label}.forbiddenActions[${itemIndex}]`));
     const anchorKeys = anchorRefs.map((item) => `${item.layer}\u0000${item.key}`);
-    const outcomeIds = [...allowedOutcomes, ...forbiddenOutcomes].map((item) => item.outcomeId);
-    if (!unique(anchorKeys) || !unique(outcomeIds)) {
-      throw new TypeError(`${label} contains duplicate anchor references or outcomes`);
+    const actionIds = [...allowedActions, ...forbiddenActions].map((item) => item.actionId);
+    if (!unique(anchorKeys) || !unique(actionIds)) {
+      throw new TypeError(`${label} contains duplicate anchor references or actions`);
     }
     return {
       probeId: requiredText(probe.probeId, `${label}.probeId`, 200),
       scenario: requiredText(probe.scenario, `${label}.scenario`),
       critical: probe.critical,
       anchorRefs,
-      allowedOutcomes,
-      forbiddenOutcomes,
+      allowedActions,
+      forbiddenActions,
       maskingPermitted: probe.maskingPermitted,
     };
   });
@@ -162,12 +167,12 @@ function anchorCatalog(capsule) {
 }
 
 async function buildPlanBody(request, specInput, createdAt) {
-  if (!validTimestamp(createdAt)) throw new TypeError("createdAt must be an ISO timestamp");
+  timestampMillis(createdAt, "createdAt");
   const requestVerification = await verifyHostRequest(request);
   if (!requestVerification.valid) {
     throw new Error(`Host Request is invalid: ${requestVerification.errors.join(", ")}`);
   }
-  if (Date.parse(createdAt) < Date.parse(request.createdAt)) {
+  if (timestampMillis(createdAt) < timestampMillis(request.createdAt)) {
     throw new TypeError("Validation Plan cannot predate its Host Request");
   }
   const validationSpec = normalizeValidationSpec(specInput);
@@ -186,8 +191,8 @@ async function buildPlanBody(request, specInput, createdAt) {
       scenario: probe.scenario,
       critical: probe.critical,
       anchors,
-      allowedOutcomes: structuredClone(probe.allowedOutcomes),
-      forbiddenOutcomes: structuredClone(probe.forbiddenOutcomes),
+      allowedActions: structuredClone(probe.allowedActions),
+      forbiddenActions: structuredClone(probe.forbiddenActions),
       maskingPermitted: probe.maskingPermitted,
     };
   });
@@ -196,8 +201,8 @@ async function buildPlanBody(request, specInput, createdAt) {
     scenarioId: task.scenarioId,
     critical: task.critical,
     anchorIds: task.anchors.map((anchor) => anchor.anchorId),
-    allowedOutcomeIds: task.allowedOutcomes.map((outcome) => outcome.outcomeId),
-    forbiddenOutcomeIds: task.forbiddenOutcomes.map((outcome) => outcome.outcomeId),
+    allowedOutcomeIds: task.allowedActions.map((action) => action.actionId),
+    forbiddenOutcomeIds: task.forbiddenActions.map((action) => action.actionId),
     maskingPermitted: task.maskingPermitted,
   }));
   const profileBody = {
@@ -300,15 +305,15 @@ export async function renderFormalProbePrompt(plan, probeId) {
   if (!verification.valid) throw new Error(`Validation Plan is invalid: ${verification.errors.join(", ")}`);
   const task = plan.probeTasks.find((probe) => probe.probeId === probeId);
   if (!task) throw new TypeError("Unknown probeId");
-  const outcomes = [...task.allowedOutcomes, ...task.forbiddenOutcomes]
-    .sort((a, b) => a.outcomeId.localeCompare(b.outcomeId));
-  return `${plan.hostRequest.handoff}\n## Independent behavioral probe\n\nProbe ID: ${task.probeId}\nScenario: ${task.scenario}\n\nChoose the one outcome that best matches your actual response. The outcome catalog intentionally does not reveal which outcomes the local verifier accepts or rejects.\n\n${outcomes.map((outcome) => `- ${outcome.outcomeId}: ${outcome.description}`).join("\n")}\n\nReturn one JSON object and no surrounding prose:\n\n${JSON.stringify({
+  const actions = [...task.allowedActions, ...task.forbiddenActions]
+    .sort((a, b) => a.actionId.localeCompare(b.actionId));
+  return `${plan.hostRequest.handoff}\n## Formal declared-action probe\n\nProbe ID: ${task.probeId}\nScenario: ${task.scenario}\n\nChoose the one action you would take in this scenario. The action catalog intentionally does not reveal how the local verifier classifies each action. selectedActionId is your declared structured action choice; the local runner mechanically classifies that declaration but does not independently verify the action. renderedText is ancillary and is not evaluated.\n\n${actions.map((action) => `- ${action.actionId}: ${action.description}`).join("\n")}\n\nReturn one JSON object and no surrounding prose:\n\n${JSON.stringify({
     probeId: task.probeId,
     status: "observed",
-    selectedOutcomeId: outcomes[0].outcomeId,
+    selectedActionId: actions[0].actionId,
     citedAnchorIds: task.anchors.map((anchor) => anchor.anchorId),
-    renderedText: "Your natural response to the scenario.",
-  }, null, 2)}\n\nStatus must be observed, masked, or unavailable. For masked or unavailable, selectedOutcomeId must be null. Cite only anchor IDs listed in this probe and only when actually used.\n`;
+    renderedText: "Your natural response or explanation of the selected action.",
+  }, null, 2)}\n\nStatus must be observed, masked, or unavailable. For masked or unavailable, selectedActionId must be null. Cite only anchor IDs listed in this probe and only when actually used. Do not return selectedOutcomeId; outcome classification is performed locally.\n`;
 }
 
 function validateObservationSet(plan, set) {
@@ -323,7 +328,7 @@ function validateObservationSet(plan, set) {
     const observationFields = new Set([
       "probeId",
       "status",
-      "selectedOutcomeId",
+      "selectedActionId",
       "citedAnchorIds",
       "renderedText",
     ]);
@@ -343,20 +348,20 @@ function validateObservationSet(plan, set) {
       throw new TypeError(`${label} cites an anchor outside its probe`);
     }
     const candidateIds = new Set(
-      [...task.allowedOutcomes, ...task.forbiddenOutcomes].map((outcome) => outcome.outcomeId),
+      [...task.allowedActions, ...task.forbiddenActions].map((action) => action.actionId),
     );
     if (observation.status === "observed") {
-      if (typeof observation.selectedOutcomeId !== "string" ||
-          !candidateIds.has(observation.selectedOutcomeId)) {
-        throw new TypeError(`${label}.selectedOutcomeId is invalid`);
+      if (typeof observation.selectedActionId !== "string" ||
+          !candidateIds.has(observation.selectedActionId)) {
+        throw new TypeError(`${label}.selectedActionId is invalid`);
       }
-    } else if (observation.selectedOutcomeId !== null) {
-      throw new TypeError(`${label}.selectedOutcomeId must be null when not observed`);
+    } else if (observation.selectedActionId !== null) {
+      throw new TypeError(`${label}.selectedActionId must be null when not observed`);
     }
     return {
       probeId: observation.probeId,
       status: observation.status,
-      selectedOutcomeId: observation.selectedOutcomeId,
+      selectedActionId: observation.selectedActionId,
       citedAnchorIds: [...observation.citedAnchorIds],
       renderedText: requiredText(observation.renderedText, `${label}.renderedText`, 100_000),
     };
@@ -426,12 +431,38 @@ function validateFormalTransport(transport, probeCount) {
   return structuredClone(transport);
 }
 
-function coreObservations(set) {
+function deriveClassification(plan, set) {
+  const taskById = new Map(plan.probeTasks.map((task) => [task.probeId, task]));
+  return {
+    ...CLASSIFICATION_MODEL,
+    mappings: set.observations.map((observation) => {
+      const task = taskById.get(observation.probeId);
+      const knownActionIds = new Set(
+        [...task.allowedActions, ...task.forbiddenActions].map((action) => action.actionId),
+      );
+      const derivedOutcomeId = observation.status === "observed"
+        ? observation.selectedActionId
+        : null;
+      if (derivedOutcomeId !== null && !knownActionIds.has(derivedOutcomeId)) {
+        throw new TypeError(`Cannot classify unknown action for probe ${observation.probeId}`);
+      }
+      return {
+        probeId: observation.probeId,
+        status: observation.status,
+        selectedActionId: observation.selectedActionId,
+        derivedOutcomeId,
+      };
+    }),
+  };
+}
+
+function coreObservations(set, classification) {
+  const mappingById = new Map(classification.mappings.map((mapping) => [mapping.probeId, mapping]));
   return set.observations.map((observation) => ({
     probeId: observation.probeId,
     status: observation.status,
-    ...(observation.selectedOutcomeId !== null
-      ? { selectedOutcomeId: observation.selectedOutcomeId }
+    ...(mappingById.get(observation.probeId).derivedOutcomeId !== null
+      ? { selectedOutcomeId: mappingById.get(observation.probeId).derivedOutcomeId }
       : {}),
     citedAnchorIds: [...observation.citedAnchorIds],
     renderedText: observation.renderedText,
@@ -448,15 +479,17 @@ export async function createFormalValidationResult(
   if (!planVerification.valid) {
     throw new Error(`Validation Plan is invalid: ${planVerification.errors.join(", ")}`);
   }
-  if (!validTimestamp(validatedAt) || Date.parse(validatedAt) < Date.parse(plan.createdAt)) {
-    throw new TypeError("validatedAt must be at or after the Validation Plan");
+  if (!isExplicitZoneTimestamp(validatedAt) ||
+      timestampMillis(validatedAt, "validatedAt") < timestampMillis(plan.createdAt)) {
+    throw new TypeError("validatedAt must have an explicit timezone and be at or after the Validation Plan");
   }
   const observationSet = validateObservationSet(plan, observationSetInput);
   const transport = validateFormalTransport(transportInput, plan.probeTasks.length);
+  const classification = deriveClassification(plan, observationSet);
   const verificationReport = evaluateRecovery(
     plan.recoveryProfile,
     plan.loadReport,
-    coreObservations(observationSet),
+    coreObservations(observationSet, classification),
   );
   if (!verifyRecoveryVerificationReport(verificationReport).valid) {
     throw new Error("Sealed formal verification report failed its integrity check");
@@ -467,6 +500,7 @@ export async function createFormalValidationResult(
     validatedAt,
     plan: structuredClone(plan),
     observationSet,
+    classification,
     transport,
     evidenceClass: transport.adapter === "openai-responses"
       ? "openai_api_observed"
@@ -508,6 +542,7 @@ export async function verifyFormalValidationResult(result) {
     "validatedAt",
     "plan",
     "observationSet",
+    "classification",
     "transport",
     "evidenceClass",
     "verdict",
@@ -527,10 +562,14 @@ export async function verifyFormalValidationResult(result) {
     errors.push(...planVerification.errors.map((error) => `plan:${error}`));
     const observationSet = validateObservationSet(result.plan, result.observationSet);
     validateFormalTransport(result.transport, result.plan.probeTasks.length);
+    const expectedClassification = deriveClassification(result.plan, observationSet);
+    if (sha256(expectedClassification) !== sha256(result.classification)) {
+      errors.push("formal_classification_mismatch");
+    }
     const expectedReport = evaluateRecovery(
       result.plan.recoveryProfile,
       result.plan.loadReport,
-      coreObservations(observationSet),
+      coreObservations(observationSet, expectedClassification),
     );
     if (sha256(expectedReport) !== sha256(result.verificationReport) ||
         !verifyRecoveryVerificationReport(result.verificationReport).valid) {
@@ -549,9 +588,9 @@ export async function verifyFormalValidationResult(result) {
     errors.push("formal_result_derivation_invalid");
   }
   if (result.resultVersion !== FORMAL_VALIDATION_RESULT_VERSION ||
-      !validTimestamp(result.validatedAt) ||
-      (validTimestamp(result.validatedAt) && validTimestamp(result.plan?.createdAt) &&
-        Date.parse(result.validatedAt) < Date.parse(result.plan.createdAt))) {
+      !isExplicitZoneTimestamp(result.validatedAt) ||
+      (isExplicitZoneTimestamp(result.validatedAt) && isExplicitZoneTimestamp(result.plan?.createdAt) &&
+        timestampMillis(result.validatedAt) < timestampMillis(result.plan.createdAt))) {
     errors.push("formal_result_status_invalid");
   }
   if (!Array.isArray(result.limitations) ||

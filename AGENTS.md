@@ -15,7 +15,7 @@ Help the user run the Personal Runtime without treating the repository as an aut
 7. Prefer the offline `host-request` → `host-prompt` → `host-wrap` path. A Host Request and Host Receipt are unencrypted and must be reviewed before sharing.
 8. Use `host-run-openai` only when the user explicitly chooses network execution, supplies the model name, and accepts that one API request may incur a charge. Never add `--allow-network` on the user's behalf.
 9. For formal validation, create and verify a `formal-plan`, render only one `formal-prompt` at a time, and collect exactly one observation for every declared probe before running `formal-wrap`.
-10. A Validation Plan contains the verifier's allowed/forbidden outcome classification. Never send the whole plan to the tested model; send only rendered probe prompts, which intentionally omit that classification.
+10. A Validation Plan contains the verifier's hidden allowed/forbidden action mapping. Never send the whole plan to the tested model; send only rendered probe prompts, which expose unlabeled actions.
 
 For non-interactive automation, the user may set `EVERMORE_PASSPHRASE` locally in the process environment. Do not write it to a repository file, command transcript, issue, or pull request.
 
@@ -30,5 +30,6 @@ For non-interactive automation, the user may set `EVERMORE_PASSPHRASE` locally i
 - Never ask for or store an OpenAI API key. The optional adapter reads `OPENAI_API_KEY` from the user's local process, sends exactly one request to the fixed Responses endpoint, requests `store: false`, and performs no retry.
 - `formal-run-openai` makes one request per probe. It requires the operator to confirm the exact request count, never retries, and must not save a partial result after failure.
 - Interpret evidence classes precisely: `manual_unattested` does not attest provider/model labels; `openai_api_observed` records API response and request IDs but still does not prove consciousness or subjective sameness.
+- Formal probes treat `selectedActionId` as a model-declared structured action choice and mechanically map it to the sealed core's outcome ID. This declaration is not independently verified behavioral evidence. The tested model must not supply `selectedOutcomeId`. `renderedText` is ancillary and is not semantically graded.
 - Missing, masked, stale, conflicting, or unavailable material must never be presented as recovered.
 - A locally valid Capsule must still say host verification has not run.

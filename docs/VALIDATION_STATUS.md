@@ -12,17 +12,18 @@ The candidate contains only generic code and explicitly synthetic tests/examples
 
 ## Personal Runtime bridge
 
-Personal Runtime `0.4.0-alpha.4` converts capsule-visible profile anchors into a real sealed-core Ledger, resolved identity, and Continuity Capsule. It creates self-contained Host Requests and can derive a sealed Recovery Profile, Recovery Bundle, LoadReport, declared probe plan, and final Verification Report. Runtime use is pinned to the exact sealed artifact above plus a hash-checked compiled subset that now includes the sealed recovery loader and final verifier. Local/private anchors and private notes are excluded before the Ledger snapshot is created.
+Personal Runtime `0.4.0-alpha.5` converts capsule-visible profile anchors into a real sealed-core Ledger, resolved identity, and Continuity Capsule. It creates self-contained Host Requests and can derive a sealed Recovery Profile, Recovery Bundle, LoadReport, declared probe plan, and final Verification Report. Runtime use is pinned to the exact sealed artifact above plus a hash-checked compiled subset that includes the sealed recovery loader and final verifier. Local/private anchors and private notes are excluded before the Ledger snapshot is created.
 
-The formal runner is tested with seven fully synthetic probes in manual and mocked-API paths. All-passing observations produce `verified`; a forbidden critical outcome produces `rejected`; incomplete anchor evidence remains `indeterminate`. The OpenAI runner requires explicit network opt-in, exact request-count confirmation, a caller-specified model, `store: false`, and no retries. No real OpenAI request, API charge, response ID, or provider receipt was produced during repository validation.
+The formal runner is tested with seven fully synthetic probes in manual and mocked-API paths. `selectedActionId` is a model-declared structured action choice; a deterministic local mapping derives the sealed core's outcome classification. The declaration is not independently verified behavioral evidence, and the model cannot submit `selectedOutcomeId`. `renderedText` is retained but explicitly marked `not_evaluated`. Model declarations that map to allowed outcomes produce `verified`; a declaration mapped to a forbidden critical outcome produces `rejected`; incomplete anchor evidence remains `indeterminate`. The OpenAI runner requires explicit network opt-in, exact request-count confirmation, a caller-specified model, `store: false`, and no retries. No real OpenAI request, API charge, response ID, or provider receipt was produced during repository validation.
 
-Current alpha.4 validation results:
+Current alpha.5 validation results:
 
-- Personal Runtime: 43/43 tests passed in the working tree and a dependency-free clean copy.
+- Personal Runtime: 50/50 tests passed under both `TZ=UTC` and `TZ=Asia/Shanghai`; 50/50 also passed in a dependency-free clean copy.
 - Sealed-core non-release-gate regression: 85/85 passed; schema validation passed.
 - Exact packed artifact scan: 40 files, zero findings, `syntheticOnly=true`.
-- Clean-copy vault → Capsule → Host Request → seven-probe Plan → sealed Formal Result completed with synthetic data.
-- The complete process-level network-deny release-gate command was not rerun in this sandbox because its guarded network APIs were blocked before execution. The sealed core source and artifact hashes are unchanged; this alpha does not replace or overstate the core's prior release-gate evidence.
+- Clean synthetic vault → Capsule → Host Request → seven-probe Plan → mechanically classified sealed Formal Result completed with verdict `verified`.
+- A minimal GitHub Actions workflow runs Node 22 runtime tests and `core/npm run check` under both timezones.
+- The process-level network-deny release-gate cannot run inside this local managed sandbox because its deliberate network API probes are intercepted before Node executes them. The public GitHub Actions jobs run the complete command. The sealed core source, vendored manifest hash (`43285c5f4b64efbafffeaf9ad8d8eae684ff640be01d78fb9f8dd2e76f54a64a`), per-file vendored hashes, and artifact hash are unchanged.
 
 ## Managed-host validation
 

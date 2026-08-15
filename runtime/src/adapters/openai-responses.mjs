@@ -6,7 +6,7 @@ import {
 } from "../host-contract.mjs";
 
 export const OPENAI_RESPONSES_ENDPOINT = "https://api.openai.com/v1/responses";
-const VALID_REASONING = new Set(["none", "low", "medium", "high", "xhigh", "max"]);
+const VALID_REASONING = new Set(["none", "minimal", "low", "medium", "high", "xhigh"]);
 
 export const HOST_OBSERVATION_SCHEMA = Object.freeze({
   type: "object",
@@ -145,4 +145,3 @@ export async function runOpenAIResponsesAdapter(request, options = {}) {
     usage: usageFrom(payload),
   }, observation, options.observedAt ?? new Date().toISOString());
 }
-

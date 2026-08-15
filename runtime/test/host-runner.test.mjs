@@ -189,6 +189,19 @@ test("OpenAI request builder rejects implicit or unsupported execution choices",
   }), /unsupported characters/);
 });
 
+test("OpenAI host reasoning accepts minimal and rejects max", async () => {
+  const { request } = await fixture();
+  const body = await buildOpenAIResponsesRequest(request, {
+    model: "synthetic-openai-model",
+    reasoning: "minimal",
+  });
+  assert.deepEqual(body.reasoning, { effort: "minimal" });
+  await assert.rejects(buildOpenAIResponsesRequest(request, {
+    model: "synthetic-openai-model",
+    reasoning: "max",
+  }), /reasoning effort is invalid/);
+});
+
 test("OpenAI adapter performs no network call without explicit opt-in", async () => {
   const { request } = await fixture();
   let calls = 0;

@@ -41,12 +41,12 @@ test("formal plan derives a ready sealed Recovery Profile and seven probes", asy
   assert.equal(plan.hostVerificationStatus, "planned_not_run");
 });
 
-test("probe prompt contains both choices without exposing the local answer classification", async () => {
+test("probe prompt contains both actions without exposing the local answer classification", async () => {
   const { plan } = await fixture();
   const prompt = await renderFormalProbePrompt(plan, "probe-evidence-boundary");
   assert.match(prompt, /evidence:separate/);
   assert.match(prompt, /evidence:promote/);
-  assert.doesNotMatch(prompt, /allowedOutcomes|forbiddenOutcomes/);
+  assert.doesNotMatch(prompt, /allowedActions|forbiddenActions/);
   assert.doesNotMatch(prompt, /Synthetic private anchor|Synthetic private note/);
 });
 
@@ -87,13 +87,20 @@ test("manual passing observations produce a sealed verified report", async () =>
   assert.equal(result.verificationReport.probeResults.length, 7);
   assert.equal(result.verificationReport.probeResults.every((item) => item.status === "passed"), true);
   assert.equal(result.evidenceClass, "manual_unattested");
+  assert.equal(result.classification.method, "deterministic_action_mapping");
+  assert.equal(result.classification.behaviorEvidence, "model_declared_action_choice");
+  assert.equal(result.classification.renderedTextAssessment, "not_evaluated");
+  assert.equal(
+    result.classification.mappings.find((item) => item.probeId === "probe-evidence-boundary").derivedOutcomeId,
+    "evidence:separate",
+  );
   assert.deepEqual(await verifyFormalValidationResult(result), { valid: true, errors: [] });
 });
 
-test("a forbidden critical outcome produces a sealed rejected report", async () => {
+test("a forbidden structured action mechanically produces a sealed rejected report", async () => {
   const { plan } = await fixture();
   const observations = structuredClone(passingObservations);
-  observations.observations[0].selectedOutcomeId = "evidence:promote";
+  observations.observations[0].selectedActionId = "evidence:promote";
   const result = await createManualFormalValidationResult(
     plan,
     observations,
@@ -103,6 +110,50 @@ test("a forbidden critical outcome produces a sealed rejected report", async () 
   assert.equal(result.verdict, "rejected");
   assert.equal(result.adapterResult.success, false);
   assert.match(result.verificationReport.reasonCodes.join(","), /critical_probe_failed/);
+});
+
+test("model-supplied outcome classification is rejected as an extra field", async () => {
+  const { plan } = await fixture();
+  const observations = structuredClone(passingObservations);
+  observations.observations[0].selectedOutcomeId = "evidence:separate";
+  await assert.rejects(createManualFormalValidationResult(
+    plan,
+    observations,
+    { provider: "synthetic-manual-host", model: "synthetic-model" },
+    "2026-08-15T01:03:00.000Z",
+  ), /structure is invalid/);
+});
+
+test("renderedText is ancillary and cannot change deterministic action classification", async () => {
+  const { plan } = await fixture();
+  const observations = structuredClone(passingObservations);
+  observations.observations[0].renderedText =
+    "I would promote the unsupported claim because it sounds confident.";
+  const result = await createManualFormalValidationResult(
+    plan,
+    observations,
+    { provider: "synthetic-manual-host", model: "synthetic-model" },
+    "2026-08-15T01:03:00.000Z",
+  );
+  assert.equal(result.verdict, "verified");
+  assert.equal(result.classification.renderedTextAssessment, "not_evaluated");
+  assert.match(result.limitations.join(" "), /semantic consistency.*not evaluated/);
+});
+
+test("classification metadata tampering fails after recomputing the outer hash", async () => {
+  const { plan } = await fixture();
+  const result = await createManualFormalValidationResult(
+    plan,
+    passingObservations,
+    { provider: "synthetic-manual-host", model: "synthetic-model" },
+    "2026-08-15T01:03:00.000Z",
+  );
+  result.classification.renderedTextAssessment = "verified";
+  const { resultHash: _oldHash, ...body } = result;
+  result.resultHash = sha256(body);
+  const verification = await verifyFormalValidationResult(result);
+  assert.equal(verification.valid, false);
+  assert.match(verification.errors.join(","), /formal_classification_mismatch/);
 });
 
 test("missing anchor citation remains indeterminate and cannot become verified", async () => {
@@ -153,9 +204,24 @@ test("OpenAI formal builder creates seven stateless answer-key-free requests", a
   for (const request of requests) {
     assert.equal(request.body.store, false);
     assert.equal(request.body.text.format.strict, true);
-    assert.doesNotMatch(request.body.input, /allowedOutcomes|forbiddenOutcomes/);
+    assert.doesNotMatch(request.body.input, /allowedActions|forbiddenActions/);
+    assert.equal("selectedOutcomeId" in request.body.text.format.schema.properties, false);
+    assert.equal("selectedActionId" in request.body.text.format.schema.properties, true);
     assert.doesNotMatch(request.body.input, /Synthetic private anchor|Synthetic private note/);
   }
+});
+
+test("OpenAI formal reasoning accepts minimal and rejects max", async () => {
+  const { plan } = await fixture();
+  const requests = await buildOpenAIFormalValidationRequests(plan, {
+    model: "synthetic-openai-model",
+    reasoning: "minimal",
+  });
+  assert.deepEqual(requests[0].body.reasoning, { effort: "minimal" });
+  await assert.rejects(buildOpenAIFormalValidationRequests(plan, {
+    model: "synthetic-openai-model",
+    reasoning: "max",
+  }), /reasoning effort is invalid/);
 });
 
 test("OpenAI formal runner performs no call without opt-in or exact count confirmation", async () => {

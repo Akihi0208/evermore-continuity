@@ -1,6 +1,7 @@
 import { sha256 } from "./canonical.mjs";
 import { verifyCoreCapsuleEnvelope } from "./core-bridge.mjs";
 import { renderCoreCapsuleHandoff } from "./handoff.mjs";
+import { isExplicitZoneTimestamp, timestampMillis } from "./timestamp.mjs";
 
 export const HOST_REQUEST_VERSION = "0.4-host-request-alpha.3";
 export const HOST_RECEIPT_VERSION = "0.4-host-receipt-alpha.3";
@@ -18,10 +19,6 @@ function exactKeys(value, keys) {
   return value && typeof value === "object" && !Array.isArray(value) &&
     Object.keys(value).length === keys.size &&
     Object.keys(value).every((key) => keys.has(key));
-}
-
-function validTimestamp(value) {
-  return typeof value === "string" && !Number.isNaN(Date.parse(value));
 }
 
 function validText(value, maximum = 100_000) {
@@ -134,12 +131,13 @@ function transportErrors(transport) {
 }
 
 export async function createHostRequest(envelope, createdAt = new Date().toISOString()) {
-  if (!validTimestamp(createdAt)) throw new TypeError("createdAt must be an ISO timestamp");
+  timestampMillis(createdAt, "createdAt");
+  timestampMillis(envelope?.generatedAt, "Continuity Capsule generatedAt");
   const verification = await verifyCoreCapsuleEnvelope(envelope);
   if (!verification.valid) {
     throw new Error(`Continuity Capsule is invalid: ${verification.errors.join(", ")}`);
   }
-  if (Date.parse(createdAt) < Date.parse(envelope.generatedAt)) {
+  if (timestampMillis(createdAt) < timestampMillis(envelope.generatedAt)) {
     throw new TypeError("Host Request cannot predate the Continuity Capsule");
   }
   const handoff = await renderCoreCapsuleHandoff(envelope);
@@ -188,8 +186,11 @@ export async function verifyHostRequest(request) {
   if (request.requestVersion !== HOST_REQUEST_VERSION || request.purpose !== "continuity_handoff") {
     errors.push("host_request_version_invalid");
   }
-  if (!validTimestamp(request.createdAt) || request.hostVerificationStatus !== "not_run") {
+  if (!isExplicitZoneTimestamp(request.createdAt) || request.hostVerificationStatus !== "not_run") {
     errors.push("host_request_status_invalid");
+  }
+  if (!isExplicitZoneTimestamp(request.capsuleEnvelope?.generatedAt)) {
+    errors.push("host_request_capsule_time_invalid");
   }
   const policyFields = new Set(["network", "storage", "receiptStatus"]);
   if (!exactKeys(request.adapterPolicy, policyFields) ||
@@ -203,8 +204,9 @@ export async function verifyHostRequest(request) {
   }
   const envelopeVerification = await verifyCoreCapsuleEnvelope(request.capsuleEnvelope);
   errors.push(...envelopeVerification.errors.map((error) => `capsule:${error}`));
-  if (validTimestamp(request.createdAt) && validTimestamp(request.capsuleEnvelope?.generatedAt) &&
-      Date.parse(request.createdAt) < Date.parse(request.capsuleEnvelope.generatedAt)) {
+  if (isExplicitZoneTimestamp(request.createdAt) &&
+      isExplicitZoneTimestamp(request.capsuleEnvelope?.generatedAt) &&
+      timestampMillis(request.createdAt) < timestampMillis(request.capsuleEnvelope.generatedAt)) {
     errors.push("host_request_predates_capsule");
   }
   if (envelopeVerification.valid) {
@@ -240,8 +242,9 @@ export async function createHostReceipt(request, transport, observation, observe
   if (!requestVerification.valid) {
     throw new Error(`Host Request is invalid: ${requestVerification.errors.join(", ")}`);
   }
-  if (!validTimestamp(observedAt) || Date.parse(observedAt) < Date.parse(request.createdAt)) {
-    throw new TypeError("observedAt must be an ISO timestamp at or after the Host Request");
+  if (!isExplicitZoneTimestamp(observedAt) ||
+      timestampMillis(observedAt, "observedAt") < timestampMillis(request.createdAt)) {
+    throw new TypeError("observedAt must have an explicit timezone and be at or after the Host Request");
   }
   const errors = [...transportErrors(transport), ...observationErrors(observation, request)];
   if (errors.length > 0) throw new Error(`Host result is invalid: ${errors.join(", ")}`);
@@ -285,11 +288,12 @@ export async function verifyHostReceipt(receipt) {
       receipt.hostVerificationStatus !== "observed_unverified") {
     errors.push("host_receipt_status_invalid");
   }
-  if (!validTimestamp(receipt.observedAt)) errors.push("host_receipt_time_invalid");
+  if (!isExplicitZoneTimestamp(receipt.observedAt)) errors.push("host_receipt_time_invalid");
   const requestVerification = await verifyHostRequest(receipt.request);
   errors.push(...requestVerification.errors.map((error) => `request:${error}`));
-  if (validTimestamp(receipt.observedAt) && validTimestamp(receipt.request?.createdAt) &&
-      Date.parse(receipt.observedAt) < Date.parse(receipt.request.createdAt)) {
+  if (isExplicitZoneTimestamp(receipt.observedAt) &&
+      isExplicitZoneTimestamp(receipt.request?.createdAt) &&
+      timestampMillis(receipt.observedAt) < timestampMillis(receipt.request.createdAt)) {
     errors.push("host_receipt_predates_request");
   }
   errors.push(...transportErrors(receipt.transport));
