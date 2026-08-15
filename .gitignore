@@ -4,6 +4,9 @@ dist/
 .DS_Store
 runtime-secrets/
 runtime-evidence/
+*.evermore-vault.json
+*.portable.json
+*.handoff.md
 *.pem
 *.key
 .env
