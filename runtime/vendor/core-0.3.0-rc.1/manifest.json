@@ -1,5 +1,5 @@
 {
-  "manifestVersion": "0.4-core-vendor-alpha.2",
+  "manifestVersion": "0.4-core-vendor-alpha.4",
   "coreVersion": "0.3.0-rc.1",
   "compiler": "TypeScript 5.9.3",
   "sealedArtifactSha256": "7865c2144c0fc55209ee9777d818517dd242a36d5ef0f00b401cf5e6009a1c48",
@@ -45,6 +45,42 @@
       "sourceSha256": "f5525fa35d4fd44e74e1bf1d892bf6a52ef86dcf3ca91073808e2d473fd16e8e",
       "runtime": "resolver.js",
       "runtimeSha256": "175b504ab4be950bdcc3411cb8c60b41bc8fed04ef8bf4cdb7d67607cbe9ef70"
+    },
+    {
+      "source": "core/src/recovery-v03/head-selection.ts",
+      "sourceSha256": "917702a99ab8652d0e5ff25453a0e35fc1c25f71df9599a0756aaec6d73275c3",
+      "runtime": "recovery-v03/head-selection.js",
+      "runtimeSha256": "ea044ebd734ee7e2bd77b9b4a523f8d0596fede8c2be7a7a861373b555791cfb"
+    },
+    {
+      "source": "core/src/recovery-v03/index.ts",
+      "sourceSha256": "51f0cc2c98adcd58893b1a8faaa4ddd51f5361dce373eae02b6fcf588b713b44",
+      "runtime": "recovery-v03/index.js",
+      "runtimeSha256": "1f2c69d52c9477d619d6687fd95db20e638ba12273dc8fdd58b7a7dc795429de"
+    },
+    {
+      "source": "core/src/recovery-v03/integrity.ts",
+      "sourceSha256": "aaa50253c2e2364235b1ec24e62579bd2f11e5f119e20d959e05646f40afb02b",
+      "runtime": "recovery-v03/integrity.js",
+      "runtimeSha256": "f5d943862ac89443edbb4900853bf829cbbb62bd458b34dd54aea3ac2183872a"
+    },
+    {
+      "source": "core/src/recovery-v03/load.ts",
+      "sourceSha256": "687b814e0de1d517c2a6a9272e6f36453a15491860bb8cb29a945da654d2b2a6",
+      "runtime": "recovery-v03/load.js",
+      "runtimeSha256": "4450c09b9c8e567b825fe6cfa00a19b2dcbe468f4bd9c93e6d08c411d23308b7"
+    },
+    {
+      "source": "core/src/recovery-v03/types.ts",
+      "sourceSha256": "23c7b109050524e1a55d3374cfd14474764c8678cd983fad724a75295fb427cd",
+      "runtime": "recovery-v03/types.js",
+      "runtimeSha256": "01ae2a5b120382f9a648ced7ee8507493a134f216d100fc61600c6c9738235d2"
+    },
+    {
+      "source": "core/src/recovery-v03/verification.ts",
+      "sourceSha256": "73a891aa25561fa3bf23930beeee807b9972de9f6e822a4e39cc0b429189975f",
+      "runtime": "recovery-v03/verification.js",
+      "runtimeSha256": "efd316c6df7d49392beef04835afd155d8c8aec5dc04b2462705844b40582617"
     }
   ]
 }

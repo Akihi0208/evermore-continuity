@@ -1,8 +1,8 @@
 # Evermore Continuity Personal Runtime
 
-This is a usable, model-neutral command-line runtime above the sealed `core/`. It lets a person create an encrypted local persona vault, turn explicitly portable anchors into a real Continuity Ledger and Capsule through the sealed core, verify the result, and render a handoff prompt for a receiving model.
+This is a usable, model-neutral command-line runtime above the sealed `core/`. It lets a person create an encrypted local persona vault, turn explicitly portable anchors into a real Continuity Ledger and Capsule, collect host observations, and run declared behavioral probes through the sealed final verifier.
 
-It does **not** ingest chat history, prove subjective sameness, or claim that a receiving model has been verified. Its default path is manual and offline. An optional OpenAI Responses adapter makes exactly one explicitly enabled request. Passing local integrity checks is not host verification.
+It does **not** ingest chat history, prove subjective sameness, or create automatic cross-session memory. Its default path is manual and offline. Optional OpenAI Responses adapters require explicit network and request-count authorization. An ordinary Host Receipt is not formal host verification; only the formal path invokes the sealed final verifier.
 
 ## Requirements
 
@@ -48,6 +48,70 @@ The model is always explicit; there is no billed default. The adapter sends exac
 
 `store: false` records what this client requested; it is not a blanket statement about every provider-side retention or account policy. No real OpenAI request is part of the repository's public test suite.
 
+## Formal sealed verification
+
+The formal runner derives a sealed Recovery Profile and LoadReport from a verified Host Request, then evaluates every declared behavioral probe with the sealed `0.3.0-rc.1` final verifier. Start with the synthetic spec as a template:
+
+```bash
+node runtime/bin/evermore.mjs formal-plan \
+  runtime-secrets/persona.evermore-vault.host-request.json \
+  runtime/examples/synthetic-validation-spec.json
+node runtime/bin/evermore.mjs verify-formal-plan \
+  runtime-secrets/persona.evermore-vault.validation-plan.json
+```
+
+The command prints every probe ID. For each ID, render one prompt and save the model's JSON-only reply as a separate file:
+
+```bash
+node runtime/bin/evermore.mjs formal-prompt \
+  runtime-secrets/persona.evermore-vault.validation-plan.json \
+  probe-evidence-boundary > runtime-secrets/probe-evidence-boundary.prompt.txt
+```
+
+Do **not** send the entire Validation Plan to the tested model. It contains the local verifier answer key: the allowed/forbidden classification. `formal-prompt` exposes both outcome choices without revealing that classification.
+
+After every probe has one response, collect them and run the sealed verifier:
+
+```bash
+node runtime/bin/evermore.mjs formal-collect \
+  runtime-secrets/persona.evermore-vault.validation-plan.json \
+  runtime-secrets/probe-*.response.json \
+  --output=runtime-secrets/persona.evermore-vault.probe-observations.json
+node runtime/bin/evermore.mjs formal-wrap \
+  runtime-secrets/persona.evermore-vault.validation-plan.json \
+  runtime-secrets/persona.evermore-vault.probe-observations.json \
+  provider-name model-name
+node runtime/bin/evermore.mjs verify-formal \
+  runtime-secrets/persona.evermore-vault.formal-validation.json
+```
+
+The final verdict is one of:
+
+- `verified` — the load evidence passed and every critical probe satisfied its declared outcome and anchor requirements.
+- `indeterminate` — evidence was missing, masked, unavailable, ambiguous, or incomplete.
+- `rejected` — a blocking identity/load rule or critical forbidden outcome was observed.
+
+Manual results use evidence class `manual_unattested`: provider and model labels are supplied by the operator. Anyone may run this path with their own profile and receiving model; the repository owner does not need to provide an account, API key, or private profile.
+
+## Optional formal OpenAI run
+
+This path makes one API request per probe. The command refuses to run unless the operator confirms the exact count from the Plan:
+
+```bash
+export OPENAI_API_KEY='your-key-kept-in-this-local-shell'
+node runtime/bin/evermore.mjs formal-run-openai \
+  runtime-secrets/persona.evermore-vault.validation-plan.json \
+  gpt-5.6-terra \
+  --allow-network \
+  --confirm-requests=7 \
+  --reasoning=medium
+unset OPENAI_API_KEY
+node runtime/bin/evermore.mjs verify-formal \
+  runtime-secrets/persona.evermore-vault.formal-validation.json
+```
+
+Each request uses the fixed Responses endpoint, `store: false`, strict Structured Outputs, and no retry. If any probe fails at the transport or parsing layer, execution stops and no Formal Result is written. A completed result records response IDs, available `x-request-id` values, token usage, and evidence class `openai_api_observed`. This is stronger transport evidence than a manual label, but it is not a digital signature or proof of consciousness.
+
 ## For coding agents and scripts
 
 Start from `examples/synthetic-profile.json`, copy it into the ignored `runtime-secrets/` directory, replace the synthetic values locally, and seal it without interactive prompts:
@@ -62,7 +126,7 @@ node runtime/bin/evermore.mjs verify-capsule runtime-secrets/my-persona.evermore
 unset EVERMORE_PASSPHRASE
 ```
 
-Do not commit the profile, vault, passphrase, Capsule, portable package, or rendered handoff. `runtime-secrets/` is ignored by Git.
+Do not commit the profile, vault, passphrase, Capsule, Host Request, Validation Plan, probe responses, Formal Result, portable package, or rendered handoff. `runtime-secrets/` is ignored by Git.
 
 Run `node runtime/bin/evermore.mjs doctor` to check the sealed artifact and every vendored bridge file without opening a vault.
 
@@ -72,10 +136,10 @@ The alpha.1 `export`, `verify-package`, and portable-package form of `prompt` re
 
 - Vaults use `scrypt` plus AES-256-GCM with a random salt and nonce.
 - Vault files are written with owner-only permissions where the operating system supports them.
-- Existing vaults, portable packages, Capsules, Host Requests, and Host Receipts are not overwritten silently.
+- Existing vaults, portable packages, Capsules, Host Requests, Host Receipts, Validation Plans, observation sets, and Formal Results are not overwritten silently.
 - Only anchors marked `capsule` enter the generated Ledger snapshot and Continuity Capsule.
 - `local` and `private` anchors, plus all `privateNotes`, remain inside the encrypted vault.
-- The Capsule has sealed-core and envelope integrity hashes, but they are not digital signatures or proof of authorship. Capsules, Host Requests, Host Receipts, and rendered prompts are not encrypted. Review them before sharing.
+- The Capsule has sealed-core and envelope integrity hashes, but they are not digital signatures or proof of authorship. Capsules, Host Requests, Host Receipts, Validation Plans, observation sets, Formal Results, and rendered prompts are not encrypted. Review them before sharing.
 - Raw chat ingestion is intentionally unsupported.
 
 ## What the bridge verifies
@@ -84,8 +148,10 @@ The alpha.1 `export`, `verify-package`, and portable-package form of `prompt` re
 - The minimal compiled core files used at runtime match a checked-in manifest and fail closed on any byte change.
 - The Capsule's sealed-core integrity hash and outer envelope hash are valid.
 - An optional expected lineage matches.
+- A Formal Plan exactly derives its Recovery Profile, Bundle, LoadReport, probe definitions, and execution policy from the verified Capsule and validation spec.
+- A Formal Result exactly replays the sealed final verifier over its bound Plan and observations.
 
-These checks do not verify the receiving host, prove that the statements are true, or establish consciousness or subjective sameness. A Host Receipt records a response as `observed_unverified`; transport success is not formal host verification.
+These checks do not prove that profile statements are true or establish consciousness or subjective sameness. A Host Receipt records a response as `observed_unverified`. A Formal Result's verdict is limited to its declared Recovery Profile, load evidence, probes, and recorded transport evidence.
 
 ## Tests
 
@@ -94,4 +160,4 @@ cd runtime
 npm test
 ```
 
-The tests cover encryption round trips, wrong-passphrase failure, Capsule generation, sealed artifact and bridge integrity, tamper detection, lineage mismatch, privacy filtering before the Ledger snapshot, Host Request/Receipt binding, manual import, explicit network opt-in, a mocked single OpenAI response, file permissions, and accidental-overwrite refusal. Tests never use a real API key or paid request.
+The tests cover encryption round trips, wrong-passphrase failure, Capsule generation, sealed artifact and bridge integrity, tamper detection, lineage mismatch, privacy filtering, Host Request/Receipt binding, formal plan derivation, all three sealed verdicts, answer-key isolation, exact request-count confirmation, mocked multi-probe OpenAI execution, stop-without-retry behavior, file permissions, and accidental-overwrite refusal. Tests never use a real API key or paid request.
