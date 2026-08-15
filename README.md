@@ -9,7 +9,7 @@ This repository is a **public testing preview** of the generic, synthetic-only c
 ## Current status
 
 - Core: `0.3.0-rc.1` sealed-release candidate.
-- Personal Runtime: `0.4.0-alpha.4`, a command-line alpha that turns encrypted local profiles into hash-verified Continuity Capsules, packages host observations, and runs declared behavioral probes through the sealed final verifier.
+- Personal Runtime: `0.4.0-alpha.5`, a hardened command-line alpha that turns encrypted local profiles into hash-verified Continuity Capsules, packages host observations, and mechanically classifies structured behavioral action choices before invoking the sealed final verifier.
 - Deterministic/offline core checks: included under `core/`.
 - Managed-host GPT-5.5 validation: provisional pass; forbidden canary rejected, 7/7 critical probes accepted, final verifier `verified`.
 - OpenAI Responses API Host #1: open for independent testing. Alpha.4 includes the complete formal runner, but repository validation remains synthetic and is not presented as a real host run.
@@ -34,7 +34,7 @@ The wizard creates an encrypted local vault. The `capsule` command sends only an
 
 For formal testing, use the included synthetic validation spec as a template, create a `formal-plan`, render individual probe prompts, and pass the collected observations to `formal-wrap`. The resulting verdict comes from the sealed `0.3.0-rc.1` final verifier. Independent testers may use their own account, model, profile, and probe spec; no project-owner account or private profile is required.
 
-This is not automatic cross-session memory. An ordinary Host Receipt remains `observed_unverified`. A formal `verified` verdict has a narrower meaning: the supplied load evidence and every critical probe satisfied the declared sealed profile. It does not prove consciousness or subjective sameness.
+This is not automatic cross-session memory. An ordinary Host Receipt remains `observed_unverified`. A formal `verified` verdict has a narrower meaning: the supplied load evidence and every critical structured action choice satisfied the declared sealed profile. The model does not classify its own outcome; the runner derives it from the selected action. The accompanying prose remains ungraded. This does not prove consciousness or subjective sameness.
 
 ## Test the sealed core
 

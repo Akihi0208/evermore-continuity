@@ -38,9 +38,21 @@ This produces an integrity-bound receipt without making a network call. Provider
 Only use this path when you intend to send the reviewed Host Request to OpenAI and accept possible API charges:
 
 ```bash
-export OPENAI_API_KEY='your-key-kept-in-this-local-shell'
-node runtime/bin/evermore.mjs host-run-openai runtime-secrets/persona.evermore-vault.host-request.json gpt-5.6-terra --allow-network --reasoning=medium
+read -rsp "OpenAI API key: " OPENAI_API_KEY; export OPENAI_API_KEY; printf '\n'
+node runtime/bin/evermore.mjs host-run-openai runtime-secrets/persona.evermore-vault.host-request.json "<model-id>" --allow-network --reasoning=medium
 unset OPENAI_API_KEY
+node runtime/bin/evermore.mjs verify-host runtime-secrets/persona.evermore-vault.host-receipt.json
+```
+
+PowerShell users can keep the key out of command history with secure input:
+
+```powershell
+$secureKey = Read-Host "OpenAI API key" -AsSecureString
+$keyPointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secureKey)
+try { $env:OPENAI_API_KEY = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($keyPointer) }
+finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($keyPointer) }
+node runtime/bin/evermore.mjs host-run-openai runtime-secrets/persona.evermore-vault.host-request.json "<model-id>" --allow-network --reasoning=medium
+Remove-Item Env:OPENAI_API_KEY
 node runtime/bin/evermore.mjs verify-host runtime-secrets/persona.evermore-vault.host-receipt.json
 ```
 
@@ -68,7 +80,7 @@ node runtime/bin/evermore.mjs formal-prompt \
   probe-evidence-boundary > runtime-secrets/probe-evidence-boundary.prompt.txt
 ```
 
-Do **not** send the entire Validation Plan to the tested model. It contains the local verifier answer key: the allowed/forbidden classification. `formal-prompt` exposes both outcome choices without revealing that classification.
+Do **not** send the entire Validation Plan to the tested model. It contains the local verifier answer key: the allowed/forbidden action mapping. `formal-prompt` exposes unlabeled action choices without revealing that mapping. The model returns `selectedActionId`; the local runner deterministically maps that ID to the sealed core's outcome classification. The model does not return `selectedOutcomeId`.
 
 After every probe has one response, collect them and run the sealed verifier:
 
@@ -87,21 +99,23 @@ node runtime/bin/evermore.mjs verify-formal \
 
 The final verdict is one of:
 
-- `verified` — the load evidence passed and every critical probe satisfied its declared outcome and anchor requirements.
+- `verified` — the load evidence passed and every critical structured action choice satisfied its declared outcome mapping and anchor requirements.
 - `indeterminate` — evidence was missing, masked, unavailable, ambiguous, or incomplete.
 - `rejected` — a blocking identity/load rule or critical forbidden outcome was observed.
 
 Manual results use evidence class `manual_unattested`: provider and model labels are supplied by the operator. Anyone may run this path with their own profile and receiving model; the repository owner does not need to provide an account, API key, or private profile.
+
+The formal verdict classifies the structured action choice, not the prose. `renderedText` is retained for inspection but has `renderedTextAssessment: not_evaluated`; this alpha does not prove that the prose semantically matches `selectedActionId`.
 
 ## Optional formal OpenAI run
 
 This path makes one API request per probe. The command refuses to run unless the operator confirms the exact count from the Plan:
 
 ```bash
-export OPENAI_API_KEY='your-key-kept-in-this-local-shell'
+read -rsp "OpenAI API key: " OPENAI_API_KEY; export OPENAI_API_KEY; printf '\n'
 node runtime/bin/evermore.mjs formal-run-openai \
   runtime-secrets/persona.evermore-vault.validation-plan.json \
-  gpt-5.6-terra \
+  "<model-id>" \
   --allow-network \
   --confirm-requests=7 \
   --reasoning=medium
@@ -110,7 +124,11 @@ node runtime/bin/evermore.mjs verify-formal \
   runtime-secrets/persona.evermore-vault.formal-validation.json
 ```
 
+On PowerShell, use the secure-input block above, run the same command with PowerShell line continuation or on one line, and then run `Remove-Item Env:OPENAI_API_KEY`.
+
 Each request uses the fixed Responses endpoint, `store: false`, strict Structured Outputs, and no retry. If any probe fails at the transport or parsing layer, execution stops and no Formal Result is written. A completed result records response IDs, available `x-request-id` values, token usage, and evidence class `openai_api_observed`. This is stronger transport evidence than a manual label, but it is not a digital signature or proof of consciousness.
+
+The runtime uses a conservative model-neutral reasoning allowlist: `none`, `minimal`, `low`, `medium`, `high`, and `xhigh`. It rejects `max`; exact reasoning support is model-specific, so check the selected model's current official documentation.
 
 ## For coding agents and scripts
 
@@ -149,7 +167,7 @@ The alpha.1 `export`, `verify-package`, and portable-package form of `prompt` re
 - The Capsule's sealed-core integrity hash and outer envelope hash are valid.
 - An optional expected lineage matches.
 - A Formal Plan exactly derives its Recovery Profile, Bundle, LoadReport, probe definitions, and execution policy from the verified Capsule and validation spec.
-- A Formal Result exactly replays the sealed final verifier over its bound Plan and observations.
+- A Formal Result re-derives the action-to-outcome classification and exactly replays the sealed final verifier over its bound Plan and observations.
 
 These checks do not prove that profile statements are true or establish consciousness or subjective sameness. A Host Receipt records a response as `observed_unverified`. A Formal Result's verdict is limited to its declared Recovery Profile, load evidence, probes, and recorded transport evidence.
 
@@ -160,4 +178,4 @@ cd runtime
 npm test
 ```
 
-The tests cover encryption round trips, wrong-passphrase failure, Capsule generation, sealed artifact and bridge integrity, tamper detection, lineage mismatch, privacy filtering, Host Request/Receipt binding, formal plan derivation, all three sealed verdicts, answer-key isolation, exact request-count confirmation, mocked multi-probe OpenAI execution, stop-without-retry behavior, file permissions, and accidental-overwrite refusal. Tests never use a real API key or paid request.
+The tests cover encryption round trips, wrong-passphrase failure, Capsule generation, sealed artifact and bridge integrity, tamper detection, lineage mismatch, privacy filtering, Host Request/Receipt binding, explicit-zone timestamps, formal plan derivation, deterministic action classification, all three sealed verdicts, answer-key isolation, reasoning allowlisting, exact request-count confirmation, mocked multi-probe OpenAI execution, stop-without-retry behavior, file permissions, and accidental-overwrite refusal. Tests never use a real API key or paid request.

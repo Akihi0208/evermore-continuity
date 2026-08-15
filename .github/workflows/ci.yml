@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Node 22 / ${{ matrix.timezone }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        timezone:
+          - UTC
+          - Asia/Shanghai
+    env:
+      TZ: ${{ matrix.timezone }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: core/package-lock.json
+      - name: Install core development dependencies
+        working-directory: core
+        run: npm ci
+      - name: Run Personal Runtime tests
+        run: node --test runtime/test/*.test.mjs
+      - name: Run sealed core checks
+        working-directory: core
+        run: npm run check

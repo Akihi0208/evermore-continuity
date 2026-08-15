@@ -29,7 +29,7 @@ import { runOpenAIFormalValidation } from "../src/adapters/openai-formal-validat
 const DEFAULT_VAULT = resolve("runtime-secrets", "persona.evermore-vault.json");
 
 function usage(exitCode = 0) {
-  const message = `Evermore Continuity Personal Runtime 0.4.0-alpha.4
+  const message = `Evermore Continuity Personal Runtime 0.4.0-alpha.5
 
 Usage:
   evermore init [vault-path]
@@ -470,7 +470,7 @@ async function verifyFormalResult(path) {
   if (!verification.valid) {
     throw new Error(`Formal Validation Result invalid: ${verification.errors.join(", ")}`);
   }
-  stdout.write("Formal Validation Result valid. Plan derivation, observations, transport, sealed report, adapter result, and hash passed.\n");
+  stdout.write("Formal Validation Result valid. Plan derivation, deterministic action classification, observations, transport, sealed report, adapter result, and hash passed.\n");
   stdout.write(`Sealed verifier verdict: ${result.verdict}. Evidence class: ${result.evidenceClass}.\n`);
 }
 
