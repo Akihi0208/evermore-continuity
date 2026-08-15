@@ -10,9 +10,11 @@ The public repository intentionally excludes the private host harness, real Reco
 
 The `runtime/` CLI is intended to let a person create their own local profile without importing raw chats. Store personal profile drafts and encrypted vaults under `runtime-secrets/`, which Git ignores. Never commit a passphrase, profile draft, vault, Continuity Capsule, portable package, or rendered handoff.
 
-Vaults are encrypted, but Continuity Capsules, portable packages, and rendered handoffs are not. They contain the capsule-visible anchors selected for transfer. The Capsule and envelope hashes detect changes; they are not digital signatures or proof of authorship. Local/private anchors and private notes do not enter the Capsule's Ledger snapshot. Review Capsules before sharing and send them only to the intended model or person.
+Vaults are encrypted, but Continuity Capsules, Host Requests, Host Receipts, portable packages, and rendered handoffs are not. They contain the capsule-visible anchors selected for transfer; receipts also contain host-generated response text and transport metadata. Their hashes detect changes but are not digital signatures or proof of authorship. Local/private anchors and private notes do not enter the Capsule's Ledger snapshot. Review every generated artifact before sharing and send it only to the intended model or person.
 
 The runtime checks the exact sealed artifact and each vendored compiled bridge file by SHA-256 before Capsule generation and verification. A mismatch or missing file fails closed. These local integrity checks do not establish host verification.
+
+The optional OpenAI adapter is disabled unless `--allow-network` is supplied. It accepts an API key only from the local `OPENAI_API_KEY` process environment, sends one request to the fixed HTTPS Responses endpoint, requests `store: false`, and does not retry. Never paste a key into chat, a profile, a Host Request, a receipt, an issue, or a shell-history command. `store: false` describes the request made by this client and does not replace review of the provider's current data and account policies.
 
 ## Reports
 
@@ -20,4 +22,4 @@ Open a GitHub issue for ordinary bugs using a synthetic reproducer. For a vulner
 
 ## Trust boundary
 
-The core verifier is deterministic and model-neutral. Host-supplied observations are untrusted input. A model response, memory-system result, or host receipt is not authoritative unless it passes the declared integrity, provenance, freshness, privacy, and verification checks.
+The core verifier is deterministic and model-neutral. Host-supplied observations are untrusted input. A syntactically valid receipt remains `observed_unverified`: it proves internal binding and tamper detection, not that provider/model labels are true, that a model retained context, or that identity continuity was established.

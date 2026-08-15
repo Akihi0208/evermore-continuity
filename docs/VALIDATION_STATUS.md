@@ -12,9 +12,9 @@ The candidate contains only generic code and explicitly synthetic tests/examples
 
 ## Personal Runtime bridge
 
-Personal Runtime `0.4.0-alpha.2` now converts capsule-visible profile anchors into a real sealed-core Ledger, resolved identity, and Continuity Capsule. Runtime use is pinned to the exact sealed artifact above plus a minimal compiled subset whose individual file hashes are checked before generation and verification. Local/private anchors and private notes are excluded before the Ledger snapshot is created.
+Personal Runtime `0.4.0-alpha.3` converts capsule-visible profile anchors into a real sealed-core Ledger, resolved identity, and Continuity Capsule. It can then create a self-contained offline Host Request and bind a manual or adapter-produced structured observation into a Host Receipt. Runtime use is pinned to the exact sealed artifact above plus a minimal compiled subset whose individual file hashes are checked before generation and verification. Local/private anchors and private notes are excluded before the Ledger snapshot is created.
 
-This is local deterministic integrity evidence only. The generated envelope records host verification as `not_run`; no live host adapter is included.
+The OpenAI Responses adapter is tested with a synthetic mocked response only. It requires explicit network opt-in, uses a caller-specified model, requests `store: false`, and performs no retry. No real OpenAI request, API charge, response ID, or provider receipt was produced during public validation. A generated Host Receipt is deliberately labeled `observed_unverified`.
 
 ## Managed-host validation
 
@@ -31,6 +31,6 @@ Evidence class: `managed-host-provisional`.
 
 The managed-host run does not count as OpenAI Responses API First Real Host Validation #1. It does not include an API response ID, `x-request-id`, API-level `store=false` evidence, or a provider receipt proving the dated model snapshot.
 
-Until that separate run is completed, the accurate statement is:
+Until a separate authorized real-host run is completed, the accurate statement is:
 
-> The deterministic core and provisional managed-host path passed; formal Responses API host validation remains pending.
+> The deterministic core, offline Host Request/Receipt path, and synthetic adapter tests passed; formal Responses API host validation remains pending.

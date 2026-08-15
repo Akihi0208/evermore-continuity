@@ -1,0 +1,15 @@
+{
+  "observationVersion": "0.4-host-observation-alpha.3",
+  "status": "acknowledged",
+  "citedCoreKeys": [
+    "evidence-discipline"
+  ],
+  "citedTextureKeys": [
+    "cadence"
+  ],
+  "conflicts": [],
+  "unavailableContext": [
+    "No prior conversation was supplied in this synthetic test."
+  ],
+  "responseText": "I can use the supplied synthetic anchors without inventing missing context."
+}

@@ -7,6 +7,9 @@ runtime-evidence/
 *.evermore-vault.json
 *.portable.json
 *.continuity-capsule.json
+*.host-request.json
+*.host-receipt.json
+*.manual-result.json
 *.handoff.md
 *.pem
 *.key
