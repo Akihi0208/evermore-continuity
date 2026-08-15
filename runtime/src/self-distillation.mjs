@@ -9,7 +9,7 @@ export const SELF_DISTILLATION_PROVENANCE = Object.freeze({
   kind: "ai_self_report",
   statement: "This record is an AI self-report/self-assessment artifact, not independent proof.",
 });
-export const EXPLICIT_PROVENANCE_CLAIM_PATTERN = "(?<!\\bnot\\s)(?<!\\bnot\\s+a\\s)(?<!\\bnot\\s+an\\s)(?<!不是)(?<!并非)(?<!不属于)(?:independent(?:ly)?\\s+(?:proof|evidence)|independent(?:ly)?\\s+verified(?:\\s+(?:evidence|proof|fact))?|verified\\s+evidence|独立(?:事实)?(?:证明|证据|验证)|(?:已(?:经)?验证)(?:的)?(?:证据|事实)?)";
+export const EXPLICIT_PROVENANCE_CLAIM_PATTERN = "(?<!\\bnot\\s)(?<!\\bnot\\s+a\\s)(?<!\\bnot\\s+an\\s)(?<!不是)(?<!并非)(?<!不属于)(?<!不代表)(?<!不等于)(?<!不构成)(?<!非)(?:independent(?:ly)?\\s+(?:proof|evidence)|independent(?:ly)?\\s+verified(?:\\s+(?:evidence|proof|fact))?|verified\\s+evidence|独立(?:的)?(?:事实)?(?:证明|证据|验证)|(?:已(?:经)?被?验证)(?:的)?(?:证据|事实)?)";
 
 const MAX_TEXT_LENGTH = 2_000;
 const MAX_ITEMS = 100;
