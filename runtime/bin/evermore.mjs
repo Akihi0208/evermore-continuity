@@ -63,6 +63,13 @@ Usage:
   evermore self-distill-import <record.json> [profile.json] [audit-report.json]
   evermore doctor
 
+For an AI with existing long-term interaction/personality history, the recommended
+entry is self-distill-prompt -> self-distill-import -> review Profile -> seal ->
+Vault -> Capsule -> Host Request / Formal Validation.
+init is Manual Profile Creation (fallback) for synthetic testing, a new persona,
+insufficient long-term evidence, or explicit manual setup. Manually entered
+Core/Texture/Boundary are operator-authored claims, not AI self-distilled evidence.
+
 Passphrases must contain at least 12 characters. For non-interactive use, set
 EVERMORE_PASSPHRASE in the process environment; never commit it to a file.
 `;
@@ -110,6 +117,10 @@ function splitEntries(value) {
 }
 
 async function interactiveProfile() {
+  stdout.write("Manual Profile Creation (fallback)\n");
+  stdout.write("If an AI already has long-term interaction/personality history, prefer self-distill-prompt first.\n");
+  stdout.write("Use init for synthetic testing, a new persona, insufficient long-term evidence, or explicit manual setup.\n");
+  stdout.write("Manually entered Core/Texture/Boundary are operator-authored claims, not AI self-distilled evidence.\n\n");
   const rl = createInterface({ input: stdin, output: stdout });
   try {
     const displayName = await rl.question("Persona display name: ");
