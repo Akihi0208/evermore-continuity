@@ -1,8 +1,8 @@
 # Evermore Continuity
 
-Evermore Continuity 是一个面向长期 AI 人格的连续性项目。当前仓库包含已经封板的 `0.3.0-rc.1` 核心，以及可以实际运行的 Personal Runtime `0.4.0-alpha.3`。
+Evermore Continuity 是一个面向长期 AI 人格的连续性项目。当前仓库包含已经封板的 `0.3.0-rc.1` 核心，以及可以实际运行的 Personal Runtime `0.4.0-alpha.4`。
 
-这不是手机直接安装的 App，也不会自动读取聊天记录。它现在能做的是：在电脑或云服务器上创建一个加密的本地人格资料库，只把你明确标记为 `capsule` 的身份锚点送入封板核心，生成可校验的 Continuity Capsule；再生成一份可交给不同模型的 Host Request，并把对方的结构化回复保存成可校验的 Host Receipt。
+这不是手机直接安装的 App，也不会自动读取聊天记录。它现在能做的是：创建加密的本地人格资料库，只把明确标记为 `capsule` 的身份锚点送入封板核心，生成可校验的 Continuity Capsule；再对接收模型执行预先声明的行为 probes，最后由封板 final verifier 给出 `verified`、`indeterminate` 或 `rejected`。
 
 ## 谁可以使用
 
@@ -31,6 +31,19 @@ node runtime/bin/evermore.mjs verify-host runtime-secrets/persona.evermore-vault
 
 整个手动流程不联网，也不需要 API Key。`verify-host` 通过只表示请求、传输记录、结构化观察和哈希彼此一致，状态仍是 `observed_unverified`，不表示接收模型已经通过正式 host 验证。可选的 OpenAI 单请求适配器见 [`runtime/README.md`](runtime/README.md)。
 
+## 正式验证
+
+仓库提供了 7 个完全合成的示例 probes。先生成并校验 Validation Plan：
+
+```bash
+node runtime/bin/evermore.mjs formal-plan runtime-secrets/persona.evermore-vault.host-request.json runtime/examples/synthetic-validation-spec.json
+node runtime/bin/evermore.mjs verify-formal-plan runtime-secrets/persona.evermore-vault.validation-plan.json
+```
+
+之后只能把 `formal-prompt` 输出的单个 probe 发给被测模型，不能把整个 Validation Plan 发过去，因为 Plan 内含本地 verifier 的结果分类。完整手动与 OpenAI API 流程见 [`runtime/README.md`](runtime/README.md)。任何人都可以使用自己的账号、模型和资料独立测试，不需要项目作者提供账号、费用或私密档案。
+
+正式结果中的 `verified` 表示：提供的 load evidence 与全部关键 probes 满足声明的 sealed profile。它不等于自动跨会话记忆，也不证明意识或主观同一性。
+
 ## 隐私提醒
 
 - 不要上传原始聊天记录。
@@ -38,6 +51,6 @@ node runtime/bin/evermore.mjs verify-host runtime-secrets/persona.evermore-vault
 - 密码只在自己的终端输入。
 - `runtime-secrets/` 已被 Git 忽略；不要把其中的文件手动提交。
 - `local`、`private` 锚点和私人备注不会进入这次 Capsule 的 Ledger 源快照。
-- Continuity Capsule、Host Request 和 Host Receipt 都没有加密，发给别人前必须检查。
+- Continuity Capsule、Host Request、Host Receipt、Validation Plan 和 Formal Result 都没有加密，发给别人前必须检查。
 
 完整英文说明见 [`runtime/README.md`](runtime/README.md)，安全边界见 [`SECURITY.md`](SECURITY.md)。

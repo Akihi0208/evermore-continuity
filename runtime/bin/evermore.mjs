@@ -16,11 +16,20 @@ import {
 } from "../src/host-contract.mjs";
 import { createManualHostReceipt, importManualHostResult } from "../src/adapters/manual.mjs";
 import { runOpenAIResponsesAdapter } from "../src/adapters/openai-responses.mjs";
+import {
+  createFormalValidationPlan,
+  createProbeObservationSet,
+  createManualFormalValidationResult,
+  renderFormalProbePrompt,
+  verifyFormalValidationPlan,
+  verifyFormalValidationResult,
+} from "../src/formal-validation.mjs";
+import { runOpenAIFormalValidation } from "../src/adapters/openai-formal-validation.mjs";
 
 const DEFAULT_VAULT = resolve("runtime-secrets", "persona.evermore-vault.json");
 
 function usage(exitCode = 0) {
-  const message = `Evermore Continuity Personal Runtime 0.4.0-alpha.3
+  const message = `Evermore Continuity Personal Runtime 0.4.0-alpha.4
 
 Usage:
   evermore init [vault-path]
@@ -38,6 +47,13 @@ Usage:
   evermore host-run-openai <host-request.json> <model> [host-receipt.json] --allow-network [--reasoning=medium]
   evermore verify-host-request <host-request.json>
   evermore verify-host <host-receipt.json>
+  evermore formal-plan <host-request.json> <validation-spec.json> [validation-plan.json]
+  evermore formal-prompt <validation-plan.json> <probe-id>
+  evermore formal-collect <validation-plan.json> <probe-response.json>... --output=observation-set.json
+  evermore formal-wrap <validation-plan.json> <observation-set.json> <provider> <model> [formal-result.json]
+  evermore formal-run-openai <validation-plan.json> <model> [formal-result.json] --allow-network --confirm-requests=N [--reasoning=medium]
+  evermore verify-formal-plan <validation-plan.json>
+  evermore verify-formal <formal-result.json>
   evermore doctor
 
 Passphrases must contain at least 12 characters. For non-interactive use, set
@@ -313,6 +329,151 @@ async function verifyReceipt(path) {
   stdout.write("Host verification status: observed_unverified.\n");
 }
 
+function defaultPlanPath(requestPath) {
+  return /\.host-request\.json$/i.test(requestPath)
+    ? requestPath.replace(/\.host-request\.json$/i, ".validation-plan.json")
+    : requestPath.replace(/\.json$/i, ".validation-plan.json");
+}
+
+function defaultFormalResultPath(planPath) {
+  return /\.validation-plan\.json$/i.test(planPath)
+    ? planPath.replace(/\.validation-plan\.json$/i, ".formal-validation.json")
+    : planPath.replace(/\.json$/i, ".formal-validation.json");
+}
+
+async function createValidationPlan(requestPath, specPath, outputPath) {
+  if (!requestPath || !specPath) {
+    throw new Error("formal-plan requires a Host Request and validation spec path");
+  }
+  const plan = await createFormalValidationPlan(
+    await loadPackage(requestPath),
+    await loadPackage(specPath),
+  );
+  const target = resolve(outputPath ?? defaultPlanPath(requestPath));
+  await writePrivateJson(target, plan);
+  stdout.write(`Formal Validation Plan created: ${target}\n`);
+  stdout.write(`Planned host requests: ${plan.executionPolicy.requestCount}. Network status: not used.\n`);
+  stdout.write(`Probe IDs: ${plan.probeTasks.map((probe) => probe.probeId).join(", ")}\n`);
+  stdout.write("The plan contains the local verifier answer key. Do not send the whole plan to a model.\n");
+}
+
+async function verifyValidationPlan(path) {
+  if (!path) throw new Error("verify-formal-plan requires a Validation Plan path");
+  const result = await verifyFormalValidationPlan(await loadPackage(path));
+  if (!result.valid) throw new Error(`Formal Validation Plan invalid: ${result.errors.join(", ")}`);
+  stdout.write("Formal Validation Plan valid. Capsule, Recovery Profile, bundle, LoadReport, probes, policy, and hash passed.\n");
+}
+
+async function formalPrompt(path, probeId) {
+  if (!path || !probeId) throw new Error("formal-prompt requires a Validation Plan and probe ID");
+  stdout.write(await renderFormalProbePrompt(await loadPackage(path), probeId));
+}
+
+function defaultObservationSetPath(planPath) {
+  return /\.validation-plan\.json$/i.test(planPath)
+    ? planPath.replace(/\.validation-plan\.json$/i, ".probe-observations.json")
+    : planPath.replace(/\.json$/i, ".probe-observations.json");
+}
+
+async function collectFormalObservations(args) {
+  const outputOptions = args.filter((item) => item.startsWith("--output="));
+  const unknownFlags = args.filter((item) => item.startsWith("--") && !item.startsWith("--output="));
+  if (outputOptions.length !== 1 || unknownFlags.length > 0) {
+    throw new Error("formal-collect requires exactly one --output=observation-set.json");
+  }
+  const positional = args.filter((item) => !item.startsWith("--"));
+  const [planPath, ...observationPaths] = positional;
+  if (!planPath || observationPaths.length === 0) {
+    throw new Error("formal-collect requires a Validation Plan and individual probe response files");
+  }
+  const plan = await loadPackage(planPath);
+  const observations = [];
+  for (const path of observationPaths) observations.push(await loadPackage(path));
+  const set = await createProbeObservationSet(plan, observations);
+  const requestedOutput = outputOptions[0].slice("--output=".length);
+  const target = resolve(requestedOutput || defaultObservationSetPath(planPath));
+  await writePrivateJson(target, set);
+  stdout.write(`Probe Observation Set created: ${target}\n`);
+  stdout.write(`Collected observations: ${set.observations.length}/${plan.probeTasks.length}.\n`);
+}
+
+async function wrapFormalResult(planPath, observationSetPath, provider, model, outputPath) {
+  if (!planPath || !observationSetPath || !provider || !model) {
+    throw new Error("formal-wrap requires a Validation Plan, observation set, provider, and model");
+  }
+  const result = await createManualFormalValidationResult(
+    await loadPackage(planPath),
+    await loadPackage(observationSetPath),
+    { provider, model },
+  );
+  const target = resolve(outputPath ?? defaultFormalResultPath(planPath));
+  await writePrivateJson(target, result);
+  stdout.write(`Formal Validation Result created: ${target}\n`);
+  stdout.write(`Sealed verifier verdict: ${result.verdict}. Evidence class: ${result.evidenceClass}.\n`);
+}
+
+function parseFormalOpenAIOptions(args) {
+  const allowNetwork = args.includes("--allow-network");
+  const reasoningOptions = args.filter((item) => item.startsWith("--reasoning="));
+  const countOptions = args.filter((item) => item.startsWith("--confirm-requests="));
+  const unknownFlags = args.filter((item) => item.startsWith("--") &&
+    item !== "--allow-network" &&
+    !item.startsWith("--reasoning=") &&
+    !item.startsWith("--confirm-requests="));
+  if (reasoningOptions.length > 1 || countOptions.length !== 1 || unknownFlags.length > 0) {
+    throw new Error("formal-run-openai requires exactly one --confirm-requests=N and valid options");
+  }
+  const positional = args.filter((item) => !item.startsWith("--"));
+  return {
+    planPath: positional[0],
+    model: positional[1],
+    outputPath: positional[2],
+    allowNetwork,
+    reasoning: reasoningOptions[0]?.slice("--reasoning=".length) ?? "medium",
+    confirmedRequestCount: Number(countOptions[0].slice("--confirm-requests=".length)),
+  };
+}
+
+async function runFormalOpenAI(args) {
+  const options = parseFormalOpenAIOptions(args);
+  if (!options.planPath || !options.model) {
+    throw new Error("formal-run-openai requires a Validation Plan path and explicit model");
+  }
+  if (!options.allowNetwork) {
+    throw new Error("formal-run-openai requires --allow-network because it makes multiple billable API requests");
+  }
+  if (!process.env.OPENAI_API_KEY) {
+    throw new Error("Set OPENAI_API_KEY locally before OpenAI execution");
+  }
+  const plan = await loadPackage(options.planPath);
+  if (options.confirmedRequestCount !== plan?.executionPolicy?.requestCount) {
+    throw new Error(`Request-count confirmation must equal ${plan?.executionPolicy?.requestCount}`);
+  }
+  stdout.write(`Executing exactly ${options.confirmedRequestCount} OpenAI Responses API requests with model ${options.model}; no retries.\n`);
+  const result = await runOpenAIFormalValidation(plan, {
+    model: options.model,
+    reasoning: options.reasoning,
+    allowNetwork: true,
+    confirmedRequestCount: options.confirmedRequestCount,
+    apiKey: process.env.OPENAI_API_KEY,
+  });
+  const target = resolve(options.outputPath ?? defaultFormalResultPath(options.planPath));
+  await writePrivateJson(target, result);
+  stdout.write(`Formal OpenAI Validation Result created: ${target}\n`);
+  stdout.write(`Sealed verifier verdict: ${result.verdict}. Evidence class: ${result.evidenceClass}.\n`);
+}
+
+async function verifyFormalResult(path) {
+  if (!path) throw new Error("verify-formal requires a Formal Validation Result path");
+  const result = await loadPackage(path);
+  const verification = await verifyFormalValidationResult(result);
+  if (!verification.valid) {
+    throw new Error(`Formal Validation Result invalid: ${verification.errors.join(", ")}`);
+  }
+  stdout.write("Formal Validation Result valid. Plan derivation, observations, transport, sealed report, adapter result, and hash passed.\n");
+  stdout.write(`Sealed verifier verdict: ${result.verdict}. Evidence class: ${result.evidenceClass}.\n`);
+}
+
 const [command, ...args] = process.argv.slice(2);
 try {
   if (!command || command === "help" || command === "--help" || command === "-h") usage();
@@ -331,6 +492,13 @@ try {
   else if (command === "host-run-openai") await runOpenAI(args);
   else if (command === "verify-host-request") await verifyRequest(args[0]);
   else if (command === "verify-host") await verifyReceipt(args[0]);
+  else if (command === "formal-plan") await createValidationPlan(args[0], args[1], args[2]);
+  else if (command === "formal-prompt") await formalPrompt(args[0], args[1]);
+  else if (command === "formal-collect") await collectFormalObservations(args);
+  else if (command === "formal-wrap") await wrapFormalResult(args[0], args[1], args[2], args[3], args[4]);
+  else if (command === "formal-run-openai") await runFormalOpenAI(args);
+  else if (command === "verify-formal-plan") await verifyValidationPlan(args[0]);
+  else if (command === "verify-formal") await verifyFormalResult(args[0]);
   else if (command === "doctor") await doctor();
   else {
     process.stderr.write(`Unknown command: ${basename(command)}\n`);

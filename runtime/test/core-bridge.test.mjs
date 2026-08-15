@@ -111,11 +111,14 @@ test("vendored bridge and exact sealed artifact are hash checked", async () => {
   await cp(new URL("../vendor/core-0.3.0-rc.1", import.meta.url), vendorRoot, { recursive: true });
   const target = join(vendorRoot, "capsule.js");
   await writeFile(target, `${await readFile(target, "utf8")}\n// synthetic tamper\n`);
+  const verifierTarget = join(vendorRoot, "recovery-v03", "verification.js");
+  await writeFile(verifierTarget, `${await readFile(verifierTarget, "utf8")}\n// synthetic tamper\n`);
   const manifest = join(vendorRoot, "manifest.json");
   await writeFile(manifest, `${await readFile(manifest, "utf8")}\n`);
   const tampered = await verifySealedCoreBridge({ artifactPath, vendorRoot });
   assert.equal(tampered.valid, false);
   assert.match(tampered.errors.join(","), /vendored_core_hash_mismatch:capsule\.js/);
+  assert.match(tampered.errors.join(","), /vendored_core_hash_mismatch:recovery-v03\/verification\.js/);
   assert.match(tampered.errors.join(","), /vendored_core_manifest_hash_mismatch/);
 });
 

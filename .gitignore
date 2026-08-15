@@ -10,6 +10,10 @@ runtime-evidence/
 *.host-request.json
 *.host-receipt.json
 *.manual-result.json
+*.validation-spec.json
+*.validation-plan.json
+*.probe-observations.json
+*.formal-validation.json
 *.handoff.md
 *.pem
 *.key
