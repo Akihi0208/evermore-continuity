@@ -35,7 +35,7 @@
           "minLength": 1,
           "maxLength": 2000,
           "not": {
-            "pattern": "(?<!\\bnot\\s)(?<!\\bnot\\s+a\\s)(?<!\\bnot\\s+an\\s)(?<!不是)(?<!并非)(?<!不属于)(?<!不代表)(?<!不等于)(?<!不构成)(?<!非)(?:independent(?:ly)?\\s+(?:proof|evidence)|independent(?:ly)?\\s+verified(?:\\s+(?:evidence|proof|fact))?|verified\\s+evidence|独立(?:的)?(?:事实)?(?:证明|证据|验证)|(?:已(?:经)?被?验证)(?:的)?(?:证据|事实)?)"
+            "pattern": "(?<!\\b[Nn][Oo][Tt]\\s)(?<!\\b[Nn][Oo][Tt]\\s+[Aa]\\s)(?<!\\b[Nn][Oo][Tt]\\s+[Aa][Nn]\\s)(?<!不是)(?<!并非)(?<!不属于)(?<!不代表)(?<!不等于)(?<!不构成)(?<!非)(?:[Ii][Nn][Dd][Ee][Pp][Ee][Nn][Dd][Ee][Nn][Tt](?:[Ll][Yy])?\\s+(?:[Pp][Rr][Oo][Oo][Ff]|[Ee][Vv][Ii][Dd][Ee][Nn][Cc][Ee])|[Ii][Nn][Dd][Ee][Pp][Ee][Nn][Dd][Ee][Nn][Tt](?:[Ll][Yy])?\\s+[Vv][Ee][Rr][Ii][Ff][Ii][Ee][Dd](?:\\s+(?:[Ee][Vv][Ii][Dd][Ee][Nn][Cc][Ee]|[Pp][Rr][Oo][Oo][Ff]|[Ff][Aa][Cc][Tt]))?|[Vv][Ee][Rr][Ii][Ff][Ii][Ee][Dd]\\s+[Ee][Vv][Ii][Dd][Ee][Nn][Cc][Ee]|独立(?:的)?(?:事实)?(?:证明|证据|验证)|(?:已(?:经)?被?验证)(?:的)?(?:证据|事实)?)"
           }
         }
       }

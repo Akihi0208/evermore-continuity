@@ -9,7 +9,10 @@ export const SELF_DISTILLATION_PROVENANCE = Object.freeze({
   kind: "ai_self_report",
   statement: "This record is an AI self-report/self-assessment artifact, not independent proof.",
 });
-export const EXPLICIT_PROVENANCE_CLAIM_PATTERN = "(?<!\\bnot\\s)(?<!\\bnot\\s+a\\s)(?<!\\bnot\\s+an\\s)(?<!不是)(?<!并非)(?<!不属于)(?<!不代表)(?<!不等于)(?<!不构成)(?<!非)(?:independent(?:ly)?\\s+(?:proof|evidence)|independent(?:ly)?\\s+verified(?:\\s+(?:evidence|proof|fact))?|verified\\s+evidence|独立(?:的)?(?:事实)?(?:证明|证据|验证)|(?:已(?:经)?被?验证)(?:的)?(?:证据|事实)?)";
+// JSON Schema `pattern` has no flags. Keep ASCII case folding explicit so the
+// schema and the runtime use the same regex semantics; the runtime therefore
+// compiles this with `u`, not with a runtime-only `i` flag.
+export const EXPLICIT_PROVENANCE_CLAIM_PATTERN = "(?<!\\b[Nn][Oo][Tt]\\s)(?<!\\b[Nn][Oo][Tt]\\s+[Aa]\\s)(?<!\\b[Nn][Oo][Tt]\\s+[Aa][Nn]\\s)(?<!不是)(?<!并非)(?<!不属于)(?<!不代表)(?<!不等于)(?<!不构成)(?<!非)(?:[Ii][Nn][Dd][Ee][Pp][Ee][Nn][Dd][Ee][Nn][Tt](?:[Ll][Yy])?\\s+(?:[Pp][Rr][Oo][Oo][Ff]|[Ee][Vv][Ii][Dd][Ee][Nn][Cc][Ee])|[Ii][Nn][Dd][Ee][Pp][Ee][Nn][Dd][Ee][Nn][Tt](?:[Ll][Yy])?\\s+[Vv][Ee][Rr][Ii][Ff][Ii][Ee][Dd](?:\\s+(?:[Ee][Vv][Ii][Dd][Ee][Nn][Cc][Ee]|[Pp][Rr][Oo][Oo][Ff]|[Ff][Aa][Cc][Tt]))?|[Vv][Ee][Rr][Ii][Ff][Ii][Ee][Dd]\\s+[Ee][Vv][Ii][Dd][Ee][Nn][Cc][Ee]|独立(?:的)?(?:事实)?(?:证明|证据|验证)|(?:已(?:经)?被?验证)(?:的)?(?:证据|事实)?)";
 
 const MAX_TEXT_LENGTH = 2_000;
 const MAX_ITEMS = 100;
@@ -53,7 +56,7 @@ const ALLOWED_CANDIDATE_FIELDS = new Set([
 const ALLOWED_EVIDENCE_FIELDS = new Set(["kind", "provenance", "description"]);
 const ALLOWED_RECURRENCE_FIELDS = new Set(["count", "crossContext", "contexts"]);
 const ALLOWED_PROVENANCE_FIELDS = new Set(["kind", "statement"]);
-const EXPLICIT_PROVENANCE_CLAIM = new RegExp(EXPLICIT_PROVENANCE_CLAIM_PATTERN, "iu");
+const EXPLICIT_PROVENANCE_CLAIM = new RegExp(EXPLICIT_PROVENANCE_CLAIM_PATTERN, "u");
 
 export class SelfDistillationImportError extends Error {
   constructor(message, auditReport, decisions) {

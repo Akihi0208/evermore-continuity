@@ -6,7 +6,6 @@ import { join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import {
-  EXPLICIT_PROVENANCE_CLAIM_PATTERN,
   importSelfDistillationRecord,
   renderSelfDistillationPrompt,
   SELF_DISTILLATION_RECORD_VERSION,
@@ -83,6 +82,30 @@ function record(candidates = [candidate()]) {
       statement: "This is an AI self-report/self-assessment artifact, not independent proof.",
     },
   };
+}
+
+function schemaAcceptsProvenanceStatement(input, schema) {
+  const provenanceSchema = schema.properties.recordProvenance;
+  const statementSchema = provenanceSchema.properties.statement;
+  const provenance = input.recordProvenance;
+  if (!provenance || provenance.kind !== provenanceSchema.properties.kind.const) return false;
+  if (typeof provenance.statement !== "string") return false;
+  if (provenance.statement.length < statementSchema.minLength || provenance.statement.length > statementSchema.maxLength) {
+    return false;
+  }
+  // Evaluate the draft-2020-12 `not.pattern` keyword as a schema validator
+  // would: JSON Schema has no flags, so this must use the pattern as written
+  // with Unicode semantics and no runtime-only case-insensitive flag.
+  return !new RegExp(statementSchema.not.pattern, "u").test(provenance.statement);
+}
+
+function runtimeAcceptsRecord(input) {
+  try {
+    validateSelfDistillationRecord(input);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 test("valid self-distillation imports into the existing Profile schema", () => {
@@ -272,26 +295,38 @@ test("shared timestamp validation rejects a Date.parse-normalized invalid calend
   assert.throws(() => validateSelfDistillationRecord(input), /explicit timezone/);
 });
 
-test("provenance schema and runtime accept Chinese self-assessment without English keywords", async () => {
-  const input = record();
-  input.recordProvenance.statement = "这是一份中文自我评估记录，只代表模型自述，不是独立事实证明。";
-  assert.doesNotThrow(() => validateSelfDistillationRecord(input));
+test("schema and runtime provenance validators have identical case and language semantics", async () => {
   const schema = JSON.parse(await readFile(
     new URL("../schema/self-distillation-record.schema.json", import.meta.url),
     "utf8",
   ));
-  assert.equal(
-    schema.properties.recordProvenance.properties.statement.not.pattern,
-    EXPLICIT_PROVENANCE_CLAIM_PATTERN,
-  );
-});
-
-test("record provenance cannot claim independent proof or verified evidence", () => {
-  const input = record();
-  input.recordProvenance.statement = "This is independently verified evidence.";
-  assert.throws(() => validateSelfDistillationRecord(input), /must not claim independent proof/);
-  input.recordProvenance.statement = "这是独立事实证明，也是 self-report。";
-  assert.throws(() => validateSelfDistillationRecord(input), /must not claim independent proof/);
+  const cases = [
+    ["independent proof", false],
+    ["INDEPENDENT PROOF", false],
+    ["IndEpEnDeNt PrOoF", false],
+    ["independently verified evidence", false],
+    ["INDEPENDENTLY VERIFIED EVIDENCE", false],
+    ["InDePeNdEnTlY VeRiFiEd FaCt", false],
+    ["verified evidence", false],
+    ["VERIFIED EVIDENCE", false],
+    ["VeRiFiEd EvIdEnCe", false],
+    ["This is not independent proof.", true],
+    ["This is NOT VERIFIED EVIDENCE.", true],
+    ["这是一份中文自我评估记录，只代表模型自述，不是独立事实证明。", true],
+    ["不代表独立事实证明，也不构成独立的事实证明。", true],
+    ["这是独立事实证明，也是 self-report。", false],
+    ["这是独立的事实验证。", false],
+    ["这是已经被验证的证据。", false],
+  ];
+  for (const [statement, expected] of cases) {
+    const input = record();
+    input.recordProvenance.statement = statement;
+    const schemaAccepted = schemaAcceptsProvenanceStatement(input, schema);
+    const runtimeAccepted = runtimeAcceptsRecord(input);
+    assert.equal(schemaAccepted, expected, `schema result for ${statement}`);
+    assert.equal(runtimeAccepted, expected, `runtime result for ${statement}`);
+    assert.equal(schemaAccepted, runtimeAccepted, `schema/runtime mismatch for ${statement}`);
+  }
 });
 
 test("the prompt contains the full protocol and strict JSON-only instruction", async () => {
