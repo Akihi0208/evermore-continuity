@@ -29,8 +29,17 @@ before sealing it. The path is `self-distill-prompt` → AI-generated
 Self-Distillation Record → `self-distill-import` → local Profile review →
 `seal` → Vault → Capsule → Host Request / Formal Validation.
 
-Create the ignored local working directory before redirecting any generated
-files into it:
+Clone the repository and enter it first:
+
+```bash
+git clone https://github.com/Akihi0208/evermore-continuity.git
+cd evermore-continuity
+```
+
+Then create the ignored local working directory before redirecting any generated
+files into it.
+
+Bash / zsh:
 
 ```bash
 mkdir -p runtime-secrets
@@ -45,8 +54,6 @@ New-Item -ItemType Directory -Force runtime-secrets | Out-Null
 Then run:
 
 ```bash
-git clone https://github.com/Akihi0208/evermore-continuity.git
-cd evermore-continuity
 node runtime/bin/evermore.mjs self-distill-prompt > runtime-secrets/self-distill.prompt.txt
 # Give the prompt to the AI and save its JSON-only Record as:
 # runtime-secrets/self-distill.record.json
