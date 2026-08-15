@@ -2,36 +2,51 @@
 
 This is a usable, model-neutral command-line runtime above the sealed `core/`. It lets a person create an encrypted local persona vault, turn explicitly portable anchors into a real Continuity Ledger and Capsule, collect host observations, and run declared behavioral probes through the sealed final verifier.
 
-It does **not** ingest chat history, prove subjective sameness, or create automatic cross-session memory. Its default path is manual and offline. Optional OpenAI Responses adapters require explicit network and request-count authorization. An ordinary Host Receipt is not formal host verification; only the formal path invokes the sealed final verifier.
+It does **not** ingest chat history, prove subjective sameness, or create automatic cross-session memory. For an AI with existing long-term interaction and personality-formation history, its default path is Self-Distillation followed by local Profile review; the manual path remains an offline fallback. Optional OpenAI Responses adapters require explicit network and request-count authorization. An ordinary Host Receipt is not formal host verification; only the formal path invokes the sealed final verifier.
 
 ## Requirements
 
 - Node.js 22 or newer
 - A computer or server terminal
 
-No package installation or API key is required for the manual path.
+No package installation or API key is required for the local Self-Distillation or manual paths.
 
 ## Fastest path
 
 From the repository root:
 
 ```bash
-node runtime/bin/evermore.mjs init
-node runtime/bin/evermore.mjs capsule runtime-secrets/persona.evermore-vault.json
-node runtime/bin/evermore.mjs verify-capsule runtime-secrets/persona.evermore-vault.continuity-capsule.json
-node runtime/bin/evermore.mjs host-request runtime-secrets/persona.evermore-vault.continuity-capsule.json
-node runtime/bin/evermore.mjs verify-host-request runtime-secrets/persona.evermore-vault.host-request.json
-node runtime/bin/evermore.mjs host-prompt runtime-secrets/persona.evermore-vault.host-request.json
+node runtime/bin/evermore.mjs self-distill-prompt > runtime-secrets/self-distill.prompt.txt
+# Give the prompt to the AI and save its JSON-only Record as:
+# runtime-secrets/self-distill.record.json
+node runtime/bin/evermore.mjs self-distill-import runtime-secrets/self-distill.record.json runtime-secrets/self-distilled-profile.json runtime-secrets/self-distill.audit.json
+# Review runtime-secrets/self-distilled-profile.json locally.
+export EVERMORE_PASSPHRASE='use-a-long-unique-passphrase'
+node runtime/bin/evermore.mjs seal runtime-secrets/self-distilled-profile.json runtime-secrets/self-distilled.vault.json
+node runtime/bin/evermore.mjs capsule runtime-secrets/self-distilled.vault.json
+node runtime/bin/evermore.mjs verify-capsule runtime-secrets/self-distilled.vault.continuity-capsule.json
+node runtime/bin/evermore.mjs host-request runtime-secrets/self-distilled.vault.continuity-capsule.json
+node runtime/bin/evermore.mjs verify-host-request runtime-secrets/self-distilled.vault.host-request.json
+node runtime/bin/evermore.mjs host-prompt runtime-secrets/self-distilled.vault.host-request.json
+unset EVERMORE_PASSPHRASE
 ```
 
 The `capsule` command verifies the exact sealed artifact and its compiled runtime bridge before creating anything. The final command prints a model-neutral prompt. Review it, paste it into the AI host you want to test, and ask the host to return only the requested JSON. Save that reply as `observation.json`, then run:
 
 ```bash
-node runtime/bin/evermore.mjs host-wrap runtime-secrets/persona.evermore-vault.host-request.json observation.json provider-name model-name
-node runtime/bin/evermore.mjs verify-host runtime-secrets/persona.evermore-vault.host-receipt.json
+node runtime/bin/evermore.mjs host-wrap runtime-secrets/self-distilled.vault.host-request.json observation.json provider-name model-name
+node runtime/bin/evermore.mjs verify-host runtime-secrets/self-distilled.vault.host-receipt.json
 ```
 
 This produces an integrity-bound receipt without making a network call. Provider and model names are labels supplied by the operator, not independently attested facts.
+
+## Manual Profile Creation / fallback
+
+`evermore init` remains available for compatibility, but it is Manual Profile
+Creation (fallback), not AI self-distillation. Use it for synthetic testing, a
+new persona, insufficient long-term evidence, or explicit manual setup. Manually
+entered Core / Texture / Boundary values are operator-authored claims, not
+evidence distilled by the AI itself.
 
 ## Optional OpenAI Responses adapter
 
@@ -152,7 +167,7 @@ The alpha.1 `export`, `verify-package`, and portable-package form of `prompt` re
 
 ## AI self-distillation
 
-The alpha.5 completeness patch adds a separate, local-audit path for the saved AI itself to propose a Profile. Give `self-distill-prompt` to the AI; it must return a Record from evidence it can actually see. Review the Record, import it, then continue through the existing seal → Vault → Capsule → Host Request → Formal Validation chain:
+The alpha.5 completeness patch provides the local-audit Self-Distillation path for the saved AI itself to propose a Profile. Give `self-distill-prompt` to the AI; it must return a Record from evidence it can actually see. Review the Record, import it, then continue through the existing seal → Vault → Capsule → Host Request → Formal Validation chain:
 
 ```bash
 node runtime/bin/evermore.mjs self-distill-prompt > runtime-secrets/self-distill.prompt.txt

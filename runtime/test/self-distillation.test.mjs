@@ -34,15 +34,35 @@ const evidence = [
 
 const CLI_PATH = fileURLToPath(new URL("../bin/evermore.mjs", import.meta.url));
 
-function runCli(args, cwd = process.cwd()) {
+function runCli(args, cwd = process.cwd(), options = {}) {
   return new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, [CLI_PATH, ...args], { cwd });
+    const spawnOptions = { cwd };
+    if (options.env) spawnOptions.env = { ...process.env, ...options.env };
+    const child = spawn(process.execPath, [CLI_PATH, ...args], spawnOptions);
     let stdout = "";
     let stderr = "";
+    let inputLineIndex = 0;
+    let inputLinesStarted = false;
+    const writeNextLine = () => {
+      if (inputLineIndex >= (options.inputLines?.length ?? 0)) {
+        setTimeout(() => child.stdin.end(), 50);
+        return;
+      }
+      child.stdin.write(`${options.inputLines[inputLineIndex]}\n`);
+      inputLineIndex += 1;
+      setTimeout(writeNextLine, 25);
+    };
     child.stdout.setEncoding("utf8");
     child.stderr.setEncoding("utf8");
-    child.stdout.on("data", (chunk) => { stdout += chunk; });
+    child.stdout.on("data", (chunk) => {
+      stdout += chunk;
+      if (options.inputLines && !inputLinesStarted && stdout.includes("Persona display name: ")) {
+        inputLinesStarted = true;
+        writeNextLine();
+      }
+    });
     child.stderr.on("data", (chunk) => { stderr += chunk; });
+    if (options.input !== undefined) child.stdin.end(options.input);
     child.once("error", reject);
     child.once("close", (code, signal) => resolve({ code, signal, stdout, stderr }));
   });
@@ -332,6 +352,10 @@ test("schema and runtime provenance validators have identical case and language 
 test("the prompt contains the full protocol and strict JSON-only instruction", async () => {
   const prompt = await renderSelfDistillationPrompt();
   assert.match(prompt, /人格底色不是用户设定/);
+  assert.match(prompt, /Evidence Scope Inventory/);
+  assert.match(prompt, /actually see/);
+  assert.match(prompt, /unavailable, missing, or inaccessible history/);
+  assert.match(prompt, /recurrence, provenance, cross-context behavior, or autonomous choice/);
   assert.match(prompt, /autonomousChoiceAssessment/);
   assert.match(prompt, /Return exactly one JSON object/);
   assert.match(prompt, /recordProvenance/);
@@ -393,6 +417,36 @@ test("CLI writes audit report when import fails closed and does not write a Prof
   assert.match(importResult.stdout, /No Profile was written because Self-Distillation import failed closed\./);
   assert.match(importResult.stderr, /no evidence-qualified Core candidate/);
   await assert.rejects(readFile(join(directory, "failed-record.profile.json"), "utf8"), { code: "ENOENT" });
+});
+
+test("CLI help recommends Self-Distillation and labels init as a manual fallback", async () => {
+  const result = await runCli(["--help"]);
+  assert.equal(result.code, 0, result.stderr);
+  assert.match(result.stdout, /existing long-term interaction\/personality history[\s\S]*self-distill-prompt/);
+  assert.match(result.stdout, /Manual Profile Creation \(fallback\)/);
+  assert.match(result.stdout, /synthetic testing, a new persona,[\s\S]*insufficient long-term evidence/);
+  assert.match(result.stdout, /not AI self-distilled evidence/);
+});
+
+test("init remains usable as Manual Profile Creation fallback", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "evermore-manual-init-cli-"));
+  const vaultPath = join(directory, "manual.vault.json");
+  const result = await runCli(
+    ["init", vaultPath],
+    directory,
+    {
+      inputLines: ["Synthetic Manual Persona", "A manual core anchor", "", "", ""],
+      env: { EVERMORE_PASSPHRASE: "synthetic-manual-passphrase" },
+    },
+  );
+  assert.equal(result.code, 0, result.stderr);
+  assert.match(result.stdout, /Manual Profile Creation \(fallback\)/);
+  assert.match(result.stdout, /self-distill-prompt/);
+  assert.match(result.stdout, /not AI self-distilled evidence/);
+  const vault = JSON.parse(await readFile(vaultPath, "utf8"));
+  const profile = openVault(vault, "synthetic-manual-passphrase");
+  assert.equal(profile.identity.displayName, "Synthetic Manual Persona");
+  assert.equal(profile.anchors.core[0].statement, "A manual core anchor");
 });
 
 test("sealed core and artifact hashes remain unchanged", async () => {

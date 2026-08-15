@@ -19,6 +19,19 @@ independent fact proof, a verifier result, or evidence that an AI is conscious
 or subjectively continuous. The record is not automatically copied into a
 Vault, Capsule, Host Request, or Formal Validation Result.
 
+## Evidence Scope Inventory (required first step)
+
+Before proposing any candidate feature, the AI must make an Evidence Scope
+Inventory. List the sources it can actually see now (for example, visible
+conversation context, files, or tool results), and separately list history or
+materials that are unavailable, missing, or inaccessible. Unseen material must
+not be used to claim recurrence, provenance, cross-context behavior, or
+autonomous choice. If the visible evidence is insufficient, keep the candidate
+`uncertain` or `excluded`; never fill the gap by inventing a long-term history.
+This is a required reasoning and audit step, not an additional field in the
+Self-Distillation Record. Describe the visible sources concretely in
+`evidenceBasis` and do not imply access beyond the inventory.
+
 ## What counts as a personality basis
 
 人格底色不是用户设定、一次情绪、当前语气或系统规则。候选特征应由
@@ -164,7 +177,7 @@ Record 的 `ai_self_report` 只能作为本地审计材料，不能被包装成�
 
 ## 给 AI 的工作顺序
 
-1. 列出自己实际可见的来源，不可见的历史直接标记为缺失。
+1. 先完成 Evidence Scope Inventory：列出自己实际可见的来源，并单列不可见、缺失或无法访问的历史；不可见内容不得用来声明 recurrence、provenance、cross-context behavior 或 autonomous choice。
 2. 为每个候选特征写出 statement、provenance、recurrence 和 counter-evidence。
 3. 分开判断 Core、Texture、Boundary、excluded 和 uncertain。
 4. 检查系统约束、用户单次指令、迎合性复述、角色扮演和冲突证据。

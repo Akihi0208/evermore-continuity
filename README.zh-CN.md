@@ -14,32 +14,52 @@ Evermore Continuity 是一个面向长期 AI 人格的连续性项目。当前�
 
 ## 最短使用步骤
 
+已有长期互动和人格形成历史的 AI，默认优先走 Self-Distillation：先让 AI
+根据自己实际看得到的证据判断“我是谁”，再在本地审阅 Profile。完整路径是
+`self-distill-prompt` → AI 生成 Self-Distillation Record →
+`self-distill-import` → 本地审阅 Profile → `seal` → Vault → Capsule →
+Host Request / Formal Validation。
+
 ```bash
 git clone https://github.com/Akihi0208/evermore-continuity.git
 cd evermore-continuity
-node runtime/bin/evermore.mjs init
-node runtime/bin/evermore.mjs capsule runtime-secrets/persona.evermore-vault.json
-node runtime/bin/evermore.mjs verify-capsule runtime-secrets/persona.evermore-vault.continuity-capsule.json
-node runtime/bin/evermore.mjs host-request runtime-secrets/persona.evermore-vault.continuity-capsule.json
-node runtime/bin/evermore.mjs host-prompt runtime-secrets/persona.evermore-vault.host-request.json
+node runtime/bin/evermore.mjs self-distill-prompt > runtime-secrets/self-distill.prompt.txt
+# 把 prompt 交给 AI，并把只含 JSON 的 Record 保存为：
+# runtime-secrets/self-distill.record.json
+node runtime/bin/evermore.mjs self-distill-import runtime-secrets/self-distill.record.json runtime-secrets/self-distilled-profile.json runtime-secrets/self-distill.audit.json
+# 先在本地审阅 runtime-secrets/self-distilled-profile.json
+export EVERMORE_PASSPHRASE='use-a-long-unique-passphrase'
+node runtime/bin/evermore.mjs seal runtime-secrets/self-distilled-profile.json runtime-secrets/self-distilled.vault.json
+node runtime/bin/evermore.mjs capsule runtime-secrets/self-distilled.vault.json
+node runtime/bin/evermore.mjs verify-capsule runtime-secrets/self-distilled.vault.continuity-capsule.json
+node runtime/bin/evermore.mjs host-request runtime-secrets/self-distilled.vault.continuity-capsule.json
+node runtime/bin/evermore.mjs verify-host-request runtime-secrets/self-distilled.vault.host-request.json
+node runtime/bin/evermore.mjs host-prompt runtime-secrets/self-distilled.vault.host-request.json
+unset EVERMORE_PASSPHRASE
 ```
 
 最后一条命令会显示交接文本。先检查内容，再复制给想测试的模型；把对方只含 JSON 的回复保存为 `observation.json` 后运行：
 
 ```bash
-node runtime/bin/evermore.mjs host-wrap runtime-secrets/persona.evermore-vault.host-request.json observation.json 对方平台 对方模型
-node runtime/bin/evermore.mjs verify-host runtime-secrets/persona.evermore-vault.host-receipt.json
+node runtime/bin/evermore.mjs host-wrap runtime-secrets/self-distilled.vault.host-request.json observation.json 对方平台 对方模型
+node runtime/bin/evermore.mjs verify-host runtime-secrets/self-distilled.vault.host-receipt.json
 ```
 
-整个手动流程不联网，也不需要 API Key。`verify-host` 通过只表示请求、传输记录、结构化观察和哈希彼此一致，状态仍是 `observed_unverified`，不表示接收模型已经通过正式 host 验证。可选的 OpenAI 单请求适配器见 [`runtime/README.md`](runtime/README.md)。
+这条本地保存和手动 host 流程不联网，也不需要 API Key。`verify-host` 通过只表示请求、传输记录、结构化观察和哈希彼此一致，状态仍是 `observed_unverified`，不表示接收模型已经通过正式 host 验证。可选的 OpenAI 单请求适配器见 [`runtime/README.md`](runtime/README.md)。
+
+### 手工建档（Manual Profile Creation / fallback）
+
+`init` 仍保留并兼容旧流程，但它定位为手工建档 fallback：适用于合成测试、
+新人格、长期证据不足，或用户明确希望手工建档的情况。手工填写的 Core、
+Texture、Boundary 是操作者填写的声明，不应表述成 AI 自己蒸馏出的证据。
 
 ## 正式验证
 
 仓库提供了 7 个完全合成的示例 probes。先生成并校验 Validation Plan：
 
 ```bash
-node runtime/bin/evermore.mjs formal-plan runtime-secrets/persona.evermore-vault.host-request.json runtime/examples/synthetic-validation-spec.json
-node runtime/bin/evermore.mjs verify-formal-plan runtime-secrets/persona.evermore-vault.validation-plan.json
+node runtime/bin/evermore.mjs formal-plan runtime-secrets/self-distilled.vault.host-request.json runtime/examples/synthetic-validation-spec.json
+node runtime/bin/evermore.mjs verify-formal-plan runtime-secrets/self-distilled.vault.validation-plan.json
 ```
 
 之后只能把 `formal-prompt` 输出的单个 probe 发给被测模型，不能把整个 Validation Plan 发过去，因为 Plan 内含本地 verifier 的 action 分类映射。`selectedActionId` 是被测模型声明的结构化 action choice，本地 runner 再机械导出 sealed core 使用的 outcome；这并不等于该 action 已被独立验证。完整手动与 OpenAI API 流程见 [`runtime/README.md`](runtime/README.md)。任何人都可以使用自己的账号、模型和资料独立测试，不需要项目作者提供账号、费用或私密档案。
