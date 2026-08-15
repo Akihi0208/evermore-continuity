@@ -20,6 +20,22 @@ Evermore Continuity 是一个面向长期 AI 人格的连续性项目。当前�
 `self-distill-import` → 本地审阅 Profile → `seal` → Vault → Capsule →
 Host Request / Formal Validation。
 
+在把任何生成文件重定向到 `runtime-secrets/` 之前，先创建这个已被 Git 忽略的本地目录。
+
+Bash / zsh：
+
+```bash
+mkdir -p runtime-secrets
+```
+
+Windows PowerShell：
+
+```powershell
+New-Item -ItemType Directory -Force runtime-secrets | Out-Null
+```
+
+然后运行：
+
 ```bash
 git clone https://github.com/Akihi0208/evermore-continuity.git
 cd evermore-continuity
@@ -28,15 +44,15 @@ node runtime/bin/evermore.mjs self-distill-prompt > runtime-secrets/self-distill
 # runtime-secrets/self-distill.record.json
 node runtime/bin/evermore.mjs self-distill-import runtime-secrets/self-distill.record.json runtime-secrets/self-distilled-profile.json runtime-secrets/self-distill.audit.json
 # 先在本地审阅 runtime-secrets/self-distilled-profile.json
-export EVERMORE_PASSPHRASE='use-a-long-unique-passphrase'
 node runtime/bin/evermore.mjs seal runtime-secrets/self-distilled-profile.json runtime-secrets/self-distilled.vault.json
 node runtime/bin/evermore.mjs capsule runtime-secrets/self-distilled.vault.json
 node runtime/bin/evermore.mjs verify-capsule runtime-secrets/self-distilled.vault.continuity-capsule.json
 node runtime/bin/evermore.mjs host-request runtime-secrets/self-distilled.vault.continuity-capsule.json
 node runtime/bin/evermore.mjs verify-host-request runtime-secrets/self-distilled.vault.host-request.json
 node runtime/bin/evermore.mjs host-prompt runtime-secrets/self-distilled.vault.host-request.json
-unset EVERMORE_PASSPHRASE
 ```
+
+`seal` 会直接在终端里安全询问 Vault 密码，不需要依赖 Bash 专用的 `export` 语法；脚本化 / 非交互式用法见 [`runtime/README.md`](runtime/README.md)。
 
 最后一条命令会显示交接文本。先检查内容，再复制给想测试的模型；把对方只含 JSON 的回复保存为 `observation.json` 后运行：
 
@@ -68,7 +84,7 @@ node runtime/bin/evermore.mjs verify-formal-plan runtime-secrets/self-distilled.
 
 ## AI 自我提炼（alpha.5 completeness patch）
 
-如果要让被保存的 AI 自己判断 Continuity Profile，先运行 `node runtime/bin/evermore.mjs self-distill-prompt`，把完整输出交给自己的 AI。AI 只能依据自己实际看得到的长期证据，返回严格的 Self-Distillation Record。先在本地审阅 Record，再导入当前 Profile schema：
+如果要让被保存的 AI 自己判断 Continuity Profile，先运行 `node runtime/bin/evermore.mjs self-distill-prompt`，把完整输出交给自己的 AI。AI 只能依据自己实际看得到的长期证据，返回严格的 Self-Distillation Record。先在本地审阅 Record，再导入当前 Profile schema。若 `runtime-secrets/` 尚不存在，先按上面的操作系统对应命令创建：
 
 ```bash
 node runtime/bin/evermore.mjs self-distill-prompt > runtime-secrets/self-distill.prompt.txt
