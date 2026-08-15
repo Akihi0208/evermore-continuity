@@ -9,7 +9,7 @@ This repository is a **public testing preview** of the generic, synthetic-only c
 ## Current status
 
 - Core: `0.3.0-rc.1` sealed-release candidate.
-- Personal Runtime: `0.4.0-alpha.1`, an offline command-line MVP for encrypted local profiles and manual model-neutral handoff.
+- Personal Runtime: `0.4.0-alpha.2`, an offline command-line alpha that turns encrypted local profiles into hash-verified Continuity Capsules through the sealed core.
 - Deterministic/offline core checks: included under `core/`.
 - Managed-host GPT-5.5 validation: provisional pass; forbidden canary rejected, 7/7 critical probes accepted, final verifier `verified`.
 - OpenAI Responses API Host #1: still pending. The managed-host result is not presented as API-level proof.
@@ -24,13 +24,14 @@ Requirements: Node.js 22 or newer.
 git clone https://github.com/Akihi0208/evermore-continuity.git
 cd evermore-continuity
 node runtime/bin/evermore.mjs init
-node runtime/bin/evermore.mjs export runtime-secrets/persona.evermore-vault.json
-node runtime/bin/evermore.mjs prompt runtime-secrets/persona.evermore-vault.portable.json
+node runtime/bin/evermore.mjs capsule runtime-secrets/persona.evermore-vault.json
+node runtime/bin/evermore.mjs verify-capsule runtime-secrets/persona.evermore-vault.continuity-capsule.json
+node runtime/bin/evermore.mjs prompt runtime-secrets/persona.evermore-vault.continuity-capsule.json
 ```
 
-The wizard creates an encrypted local vault, exports only anchors marked for portable use, and renders a handoff that can be reviewed and pasted into a receiving model. It does not need an API key, ingest chat history, or make network calls. See [`runtime/README.md`](runtime/README.md) for verification commands, scripting support, and the privacy model.
+The wizard creates an encrypted local vault. The `capsule` command sends only anchors marked `capsule` through the sealed ledger, resolver, and Capsule generator, then binds the result to the exact sealed artifact and a hash-checked compiled bridge. The handoff can be reviewed and pasted into a receiving model. It does not need an API key, ingest chat history, or make network calls. See [`runtime/README.md`](runtime/README.md) for verification commands, scripting support, the legacy alpha.1 export path, and the privacy model.
 
-This is a manual alpha, not automatic cross-session memory. The receiving model must be given the handoff in a context it can read.
+This is a manual alpha, not automatic cross-session memory. Local integrity passing does not mean a receiving host has been verified; the receiving model must be given the handoff in a context it can read.
 
 ## Test the sealed core
 
@@ -55,7 +56,7 @@ Please use synthetic data only and open a GitHub issue with the provided templat
 ## Repository layout
 
 - `core/` — readable TypeScript source, specifications, synthetic examples, and tests.
-- `runtime/` — offline encrypted-vault CLI and portable handoff generator.
+- `runtime/` — offline encrypted-vault CLI, sealed-core bridge, Continuity Capsule, and portable handoff generator.
 - `artifacts/` — the exact sealed npm release-candidate artifact.
 - `docs/VALIDATION_STATUS.md` — precise claims and current evidence limits.
 - `SECURITY.md` — safe testing and disclosure guidance.

@@ -8,9 +8,11 @@ The public repository intentionally excludes the private host harness, real Reco
 
 ## Personal Runtime data stays local
 
-The `runtime/` CLI is intended to let a person create their own local profile without importing raw chats. Store personal profile drafts and encrypted vaults under `runtime-secrets/`, which Git ignores. Never commit a passphrase, profile draft, vault, portable package, or rendered handoff.
+The `runtime/` CLI is intended to let a person create their own local profile without importing raw chats. Store personal profile drafts and encrypted vaults under `runtime-secrets/`, which Git ignores. Never commit a passphrase, profile draft, vault, Continuity Capsule, portable package, or rendered handoff.
 
-Vaults are encrypted, but portable packages and rendered handoffs are not. They contain the capsule-visible anchors selected for transfer. The package hash detects accidental changes; it is not a digital signature or proof of authorship. Review packages before sharing and send them only to the intended model or person.
+Vaults are encrypted, but Continuity Capsules, portable packages, and rendered handoffs are not. They contain the capsule-visible anchors selected for transfer. The Capsule and envelope hashes detect changes; they are not digital signatures or proof of authorship. Local/private anchors and private notes do not enter the Capsule's Ledger snapshot. Review Capsules before sharing and send them only to the intended model or person.
+
+The runtime checks the exact sealed artifact and each vendored compiled bridge file by SHA-256 before Capsule generation and verification. A mismatch or missing file fails closed. These local integrity checks do not establish host verification.
 
 ## Reports
 

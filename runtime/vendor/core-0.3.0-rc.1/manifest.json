@@ -1,0 +1,50 @@
+{
+  "manifestVersion": "0.4-core-vendor-alpha.2",
+  "coreVersion": "0.3.0-rc.1",
+  "compiler": "TypeScript 5.9.3",
+  "sealedArtifactSha256": "7865c2144c0fc55209ee9777d818517dd242a36d5ef0f00b401cf5e6009a1c48",
+  "files": [
+    {
+      "source": "core/src/acceptance-status.ts",
+      "sourceSha256": "1e6f99a8e21853d447037961fbe927c3f5f0dd021c58aabf2a3046416cfba1c6",
+      "runtime": "acceptance-status.js",
+      "runtimeSha256": "033899e481d798d06aac8e363014902c98e9e7d6b9f183c85418cdf6d1142f20"
+    },
+    {
+      "source": "core/src/canonical.ts",
+      "sourceSha256": "007b6d2ad727d7ad93c2104a722e91dee9424600a6ea27394c64fb875d454ffa",
+      "runtime": "canonical.js",
+      "runtimeSha256": "1ae9791d8835625762805e27313ab232aac3bf4e801b844af2e786966eb918f9"
+    },
+    {
+      "source": "core/src/capsule.ts",
+      "sourceSha256": "84d1d8b1ac0fbd4e87d10219420bced5d91d73199da5b92a1388ec1b532c6a9b",
+      "runtime": "capsule.js",
+      "runtimeSha256": "6fba89bca2ea89c9b964c18f6fd0ffbcc9cba9bd8244d974acc67fe779327fc1"
+    },
+    {
+      "source": "core/src/errors.ts",
+      "sourceSha256": "5c86546dc9bf1fe32630d60161859ed4ee5e936b3f24b42d65adc3e169b20878",
+      "runtime": "errors.js",
+      "runtimeSha256": "b153d59fa7d4ea03f7390ef800b9d2caf82b6e9833739508bd893126045c1dd6"
+    },
+    {
+      "source": "core/src/ledger.ts",
+      "sourceSha256": "892f2277b8e5f9435aead47057048c97f4142ca8fc6e8b9e958902835fa1dcfd",
+      "runtime": "ledger.js",
+      "runtimeSha256": "8ec0969ef875403e11fc509537e5f74c33bdbb1a65f332523af346a23bdd02b5"
+    },
+    {
+      "source": "core/src/provenance.ts",
+      "sourceSha256": "73bc7f4478310e24ade032500a59ab9374a41c0fc93acba7ee640beab1eac09b",
+      "runtime": "provenance.js",
+      "runtimeSha256": "bdc3fc1206d7ab09381e8cc0f6556c653047e7e9ef7f5e1d60d78a06eb559f58"
+    },
+    {
+      "source": "core/src/resolver.ts",
+      "sourceSha256": "f5525fa35d4fd44e74e1bf1d892bf6a52ef86dcf3ca91073808e2d473fd16e8e",
+      "runtime": "resolver.js",
+      "runtimeSha256": "175b504ab4be950bdcc3411cb8c60b41bc8fed04ef8bf4cdb7d67607cbe9ef70"
+    }
+  ]
+}
