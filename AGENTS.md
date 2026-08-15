@@ -30,6 +30,6 @@ For non-interactive automation, the user may set `EVERMORE_PASSPHRASE` locally i
 - Never ask for or store an OpenAI API key. The optional adapter reads `OPENAI_API_KEY` from the user's local process, sends exactly one request to the fixed Responses endpoint, requests `store: false`, and performs no retry.
 - `formal-run-openai` makes one request per probe. It requires the operator to confirm the exact request count, never retries, and must not save a partial result after failure.
 - Interpret evidence classes precisely: `manual_unattested` does not attest provider/model labels; `openai_api_observed` records API response and request IDs but still does not prove consciousness or subjective sameness.
-- Formal probes treat `selectedActionId` as the structured behavioral choice and mechanically map it to the sealed core's outcome ID. The tested model must not supply `selectedOutcomeId`. `renderedText` is ancillary and is not semantically graded.
+- Formal probes treat `selectedActionId` as a model-declared structured action choice and mechanically map it to the sealed core's outcome ID. This declaration is not independently verified behavioral evidence. The tested model must not supply `selectedOutcomeId`. `renderedText` is ancillary and is not semantically graded.
 - Missing, masked, stale, conflicting, or unavailable material must never be presented as recovered.
 - A locally valid Capsule must still say host verification has not run.

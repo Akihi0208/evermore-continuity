@@ -88,7 +88,7 @@ test("manual passing observations produce a sealed verified report", async () =>
   assert.equal(result.verificationReport.probeResults.every((item) => item.status === "passed"), true);
   assert.equal(result.evidenceClass, "manual_unattested");
   assert.equal(result.classification.method, "deterministic_action_mapping");
-  assert.equal(result.classification.behaviorEvidence, "structured_action_choice");
+  assert.equal(result.classification.behaviorEvidence, "model_declared_action_choice");
   assert.equal(result.classification.renderedTextAssessment, "not_evaluated");
   assert.equal(
     result.classification.mappings.find((item) => item.probeId === "probe-evidence-boundary").derivedOutcomeId,

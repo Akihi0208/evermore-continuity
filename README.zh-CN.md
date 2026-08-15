@@ -40,9 +40,9 @@ node runtime/bin/evermore.mjs formal-plan runtime-secrets/persona.evermore-vault
 node runtime/bin/evermore.mjs verify-formal-plan runtime-secrets/persona.evermore-vault.validation-plan.json
 ```
 
-之后只能把 `formal-prompt` 输出的单个 probe 发给被测模型，不能把整个 Validation Plan 发过去，因为 Plan 内含本地 verifier 的 action 分类映射。被测模型只返回结构化的 `selectedActionId`，本地 runner 再机械导出 sealed core 使用的 outcome；模型不再给自己的结果判类。完整手动与 OpenAI API 流程见 [`runtime/README.md`](runtime/README.md)。任何人都可以使用自己的账号、模型和资料独立测试，不需要项目作者提供账号、费用或私密档案。
+之后只能把 `formal-prompt` 输出的单个 probe 发给被测模型，不能把整个 Validation Plan 发过去，因为 Plan 内含本地 verifier 的 action 分类映射。`selectedActionId` 是被测模型声明的结构化 action choice，本地 runner 再机械导出 sealed core 使用的 outcome；这并不等于该 action 已被独立验证。完整手动与 OpenAI API 流程见 [`runtime/README.md`](runtime/README.md)。任何人都可以使用自己的账号、模型和资料独立测试，不需要项目作者提供账号、费用或私密档案。
 
-正式结果中的 `verified` 表示：提供的 load evidence 与全部关键 probes 的结构化 action 选择满足声明的 sealed profile。`renderedText` 只保留作人工检查，当前版本不判断它与 action 的语义是否一致。这个结果不等于自动跨会话记忆，也不证明意识或主观同一性。
+正式结果中的 `verified` 表示：提供的 load evidence 通过，且全部关键 probes 中由模型声明的 action ID 经本地 deterministic classification 后落入允许的 sealed outcome，并带有所需的声明引用。它不表示 action 本身已经被独立验证。`renderedText` 只保留作人工检查，当前版本不判断它与 action 的语义是否一致。这个结果不等于自动跨会话记忆，也不证明意识或主观同一性。
 
 ## 隐私提醒
 

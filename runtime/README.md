@@ -80,7 +80,7 @@ node runtime/bin/evermore.mjs formal-prompt \
   probe-evidence-boundary > runtime-secrets/probe-evidence-boundary.prompt.txt
 ```
 
-Do **not** send the entire Validation Plan to the tested model. It contains the local verifier answer key: the allowed/forbidden action mapping. `formal-prompt` exposes unlabeled action choices without revealing that mapping. The model returns `selectedActionId`; the local runner deterministically maps that ID to the sealed core's outcome classification. The model does not return `selectedOutcomeId`.
+Do **not** send the entire Validation Plan to the tested model. It contains the local verifier answer key: the allowed/forbidden action mapping. `formal-prompt` exposes unlabeled action choices without revealing that mapping. The model returns `selectedActionId` as a model-declared structured action choice; the local runner deterministically maps that declaration to the sealed core's outcome classification. This is not independent verification of the action. The model does not return `selectedOutcomeId`.
 
 After every probe has one response, collect them and run the sealed verifier:
 
@@ -99,13 +99,13 @@ node runtime/bin/evermore.mjs verify-formal \
 
 The final verdict is one of:
 
-- `verified` — the load evidence passed and every critical structured action choice satisfied its declared outcome mapping and anchor requirements.
+- `verified` — the load evidence passed and every critical model-declared action ID mapped to an allowed sealed outcome with the required declared anchor citations.
 - `indeterminate` — evidence was missing, masked, unavailable, ambiguous, or incomplete.
 - `rejected` — a blocking identity/load rule or critical forbidden outcome was observed.
 
 Manual results use evidence class `manual_unattested`: provider and model labels are supplied by the operator. Anyone may run this path with their own profile and receiving model; the repository owner does not need to provide an account, API key, or private profile.
 
-The formal verdict classifies the structured action choice, not the prose. `renderedText` is retained for inspection but has `renderedTextAssessment: not_evaluated`; this alpha does not prove that the prose semantically matches `selectedActionId`.
+The formal verdict deterministically classifies a model-declared action choice; it does not independently verify the action or grade the prose. `renderedText` is retained for inspection but has `renderedTextAssessment: not_evaluated`; this alpha does not prove that the prose semantically matches `selectedActionId`.
 
 ## Optional formal OpenAI run
 
