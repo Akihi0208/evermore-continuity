@@ -29,6 +29,21 @@ before sealing it. The path is `self-distill-prompt` → AI-generated
 Self-Distillation Record → `self-distill-import` → local Profile review →
 `seal` → Vault → Capsule → Host Request / Formal Validation.
 
+Create the ignored local working directory before redirecting any generated
+files into it:
+
+```bash
+mkdir -p runtime-secrets
+```
+
+PowerShell:
+
+```powershell
+New-Item -ItemType Directory -Force runtime-secrets | Out-Null
+```
+
+Then run:
+
 ```bash
 git clone https://github.com/Akihi0208/evermore-continuity.git
 cd evermore-continuity
@@ -37,15 +52,17 @@ node runtime/bin/evermore.mjs self-distill-prompt > runtime-secrets/self-distill
 # runtime-secrets/self-distill.record.json
 node runtime/bin/evermore.mjs self-distill-import runtime-secrets/self-distill.record.json runtime-secrets/self-distilled-profile.json runtime-secrets/self-distill.audit.json
 # Review runtime-secrets/self-distilled-profile.json locally.
-export EVERMORE_PASSPHRASE='use-a-long-unique-passphrase'
 node runtime/bin/evermore.mjs seal runtime-secrets/self-distilled-profile.json runtime-secrets/self-distilled.vault.json
 node runtime/bin/evermore.mjs capsule runtime-secrets/self-distilled.vault.json
 node runtime/bin/evermore.mjs verify-capsule runtime-secrets/self-distilled.vault.continuity-capsule.json
 node runtime/bin/evermore.mjs host-request runtime-secrets/self-distilled.vault.continuity-capsule.json
 node runtime/bin/evermore.mjs verify-host-request runtime-secrets/self-distilled.vault.host-request.json
 node runtime/bin/evermore.mjs host-prompt runtime-secrets/self-distilled.vault.host-request.json
-unset EVERMORE_PASSPHRASE
 ```
+
+`seal` prompts for the Vault passphrase without requiring shell-specific
+environment-variable syntax. For scripted/non-interactive use, see
+[`runtime/README.md`](runtime/README.md).
 
 `self-distill-import` writes a separate local audit report and fails closed when
 the evidence cannot support a Profile. After local review, `seal` creates the
@@ -72,7 +89,7 @@ This is not automatic cross-session memory. An ordinary Host Receipt remains `ob
 
 ## AI self-distillation (alpha.5 completeness patch)
 
-For an AI to assess its own Continuity Profile, give that AI the output of `node runtime/bin/evermore.mjs self-distill-prompt`. The AI must use only its actually visible long-term evidence and return a strict Self-Distillation Record. Review the local record, then import it into the existing Profile schema:
+For an AI to assess its own Continuity Profile, give that AI the output of `node runtime/bin/evermore.mjs self-distill-prompt`. The AI must use only its actually visible long-term evidence and return a strict Self-Distillation Record. Review the local record, then import it into the existing Profile schema. Create `runtime-secrets/` first as shown above if it does not already exist:
 
 ```bash
 node runtime/bin/evermore.mjs self-distill-prompt > runtime-secrets/self-distill.prompt.txt
