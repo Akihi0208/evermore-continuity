@@ -2,6 +2,8 @@
 
 Evermore Continuity 是一个面向长期 AI 人格的连续性项目。当前仓库包含已经封板的 `0.3.0-rc.1` 核心，以及可以实际运行的 Personal Runtime `0.4.0-alpha.5`。
 
+创建与维护：**沈雾**。
+
 这不是手机直接安装的 App，也不会自动读取聊天记录。它现在能做的是：创建加密的本地人格资料库，只把明确标记为 `capsule` 的身份锚点送入封板核心，生成可校验的 Continuity Capsule；再对接收模型执行预先声明的行为 probes，最后由封板 final verifier 给出 `verified`、`indeterminate` 或 `rejected`。
 
 ## 谁可以使用
