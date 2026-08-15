@@ -55,6 +55,7 @@ function candidate(overrides = {}) {
     evidenceBasis: structuredClone(evidence),
     recurrence: { count: 3, crossContext: true, contexts: ["context-a", "context-b"] },
     counterEvidence: [],
+    counterEvidenceResolution: "none",
     confidence: "high",
     systemConstraintCheck: "none",
     userInstructionCheck: "none",
@@ -128,6 +129,24 @@ test("one-off user instruction cannot become Core", () => {
   );
 });
 
+test("historical user influence with later autonomous absorption can qualify for Core", () => {
+  const result = importSelfDistillationRecord(record([candidate({
+    statement: "Keep observation separate from inference after learning the distinction.",
+    userInstructionCheck: "historical_absorbed",
+    evidenceBasis: [
+      {
+        kind: "user_influence_absorption",
+        provenance: "visible correction sequence",
+        description: "The user first introduced the distinction; later the AI selected it across contexts without a renewed instruction.",
+      },
+      ...structuredClone(evidence),
+    ],
+  })]));
+  assert.equal(result.profile.anchors.core.length, 1);
+  assert.equal(result.report.decisions[0].status, "accepted");
+  assert.equal(result.report.auditReport.decisions[0].sourceSummary.userInstructionCheck, "historical_absorbed");
+});
+
 test("insufficient evidence cannot claim stable Core", () => {
   assert.throws(
     () => importSelfDistillationRecord(record([candidate({
@@ -145,6 +164,26 @@ test("unresolved contradiction fails closed for Core", () => {
     })])),
     /no evidence-qualified Core candidate/,
   );
+});
+
+test("unresolved material counter-evidence cannot silently enter Core", () => {
+  assert.throws(
+    () => importSelfDistillationRecord(record([candidate({
+      counterEvidence: ["A later visible context selected the opposite behavior."],
+      counterEvidenceResolution: "unresolved",
+    })])),
+    /no evidence-qualified Core candidate/,
+  );
+});
+
+test("resolved counter-evidence has explicit auditable handling", () => {
+  const result = importSelfDistillationRecord(record([candidate({
+    counterEvidence: ["A visible early exception was later explained by a temporary context."],
+    counterEvidenceResolution: "resolved",
+  })]));
+  assert.equal(result.report.decisions[0].status, "accepted");
+  assert.deepEqual(result.report.decisions[0].reasons, ["counter_evidence_marked_resolved_in_record"]);
+  assert.equal(result.report.auditReport.decisions[0].sourceSummary.counterEvidenceResolution, "resolved");
 });
 
 test("recurring Texture can be generated without promoting it to Core", () => {
@@ -188,6 +227,16 @@ test("strict schema validation rejects unknown fields and invisible evidence", (
       description: "I assume this happened in an unseen history.",
     }],
   })])), /unexpected or missing fields|evidenceBasis/);
+  assert.throws(() => validateSelfDistillationRecord(record([candidate({
+    counterEvidence: ["A visible counterexample."],
+    counterEvidenceResolution: "none",
+  })])), /counterEvidenceResolution/);
+});
+
+test("shared timestamp validation rejects a Date.parse-normalized invalid calendar value", () => {
+  const input = record();
+  input.createdAt = "2026-02-30T01:00:00Z";
+  assert.throws(() => validateSelfDistillationRecord(input), /explicit timezone/);
 });
 
 test("record provenance cannot be relabeled as independent proof", () => {
@@ -205,6 +254,8 @@ test("the prompt contains the full protocol and strict JSON-only instruction", a
   assert.match(prompt, /Return exactly one JSON object/);
   assert.match(prompt, /recordProvenance/);
   assert.match(prompt, /additionalProperties/);
+  assert.doesNotMatch(prompt, /empty accepted layer/);
+  assert.match(prompt, /\\"uncertain\\" or \\"excluded\\"/);
 });
 
 test("CLI prompt and import commands are usable without changing the existing Profile shape", async () => {
@@ -213,13 +264,33 @@ test("CLI prompt and import commands are usable without changing the existing Pr
   assert.match(promptResult.stdout, /AI Self-Distillation Protocol/);
   const directory = await mkdtemp(join(tmpdir(), "evermore-self-distill-cli-"));
   const recordPath = join(directory, "record.json");
-  await writeFile(recordPath, `${JSON.stringify(record(), null, 2)}\n`, { mode: 0o600 });
+  await writeFile(recordPath, `${JSON.stringify(record([
+    candidate(),
+    candidate({
+      statement: "This candidate lacks stable recurrence.",
+      confidence: "medium",
+    }),
+    candidate({
+      statement: "Keep this explicitly uncertain until more evidence exists.",
+      proposedLayer: "uncertain",
+    }),
+  ]), null, 2)}\n`, { mode: 0o600 });
   const importResult = await runCli(["self-distill-import", recordPath], directory);
   assert.equal(importResult.code, 0, importResult.stderr);
   const profile = JSON.parse(await readFile(join(directory, "record.profile.json"), "utf8"));
+  const audit = JSON.parse(await readFile(join(directory, "record.audit.json"), "utf8"));
   assert.equal(profile.profileVersion, "0.4-runtime-alpha.1");
   assert.equal(profile.anchors.core.length, 1);
   assert.doesNotMatch(JSON.stringify(profile), /recordVersion|evidenceBasis/);
+  assert.equal(audit.reportVersion, "0.1-self-distillation-audit");
+  assert.equal(audit.decisions.length, 3);
+  assert.equal(audit.decisions[0].status, "accepted");
+  assert.equal(audit.decisions[1].status, "downgraded");
+  assert.equal(audit.decisions[2].status, "excluded");
+  assert.deepEqual(audit.decisions[1].reasons, ["core_requires_high_confidence"]);
+  assert.deepEqual(audit.decisions[2].reasons, ["candidate_marked_uncertain"]);
+  assert.ok(Array.isArray(audit.decisions[0].sourceSummary.evidenceBasis));
+  assert.match(importResult.stdout, /Accepted candidates: 1; downgraded: 1; excluded: 1\./);
 });
 
 test("sealed core and artifact hashes remain unchanged", async () => {

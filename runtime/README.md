@@ -156,13 +156,13 @@ The alpha.5 completeness patch adds a separate, local-audit path for the saved A
 
 ```bash
 node runtime/bin/evermore.mjs self-distill-prompt > runtime-secrets/self-distill.prompt.txt
-node runtime/bin/evermore.mjs self-distill-import runtime-secrets/self-distill.record.json runtime-secrets/self-distilled-profile.json
+node runtime/bin/evermore.mjs self-distill-import runtime-secrets/self-distill.record.json runtime-secrets/self-distilled-profile.json runtime-secrets/self-distill.audit.json
 # Review runtime-secrets/self-distilled-profile.json locally.
 node runtime/bin/evermore.mjs seal runtime-secrets/self-distilled-profile.json runtime-secrets/self-distilled.vault.json
 node runtime/bin/evermore.mjs capsule runtime-secrets/self-distilled.vault.json
 ```
 
-`self-distill-import` strictly validates the Self-Distillation Record schema and writes only the existing Profile shape. The Record remains AI self-report/self-assessment evidence, not independent proof. Import fails closed when a candidate has insufficient evidence for Core, is actually a system/platform constraint, is only a one-off user instruction, or has unresolved conflict. It never copies the Record, its rationale, recurrence, or provenance into a Capsule. The Profile provenance remains `self_authored`: a self-report selection, not independent proof. Read [`../AI_SELF_DISTILLATION_PROTOCOL.md`](../AI_SELF_DISTILLATION_PROTOCOL.md) before using the flow.
+`self-distill-import` strictly validates the Self-Distillation Record schema, writes only the existing Profile shape, and writes a separate local audit report containing every candidate decision, reason, and source summary. The Record remains AI self-report/self-assessment evidence, not independent proof. Import fails closed when a candidate has insufficient evidence for Core, is actually a system/platform constraint, is still directly driven by a user instruction, has unresolved counter-evidence, or has unresolved conflict. It never copies the Record, its rationale, recurrence, or provenance into a Capsule. The Profile provenance remains `self_authored`: a self-report selection, not independent proof. Read [`../AI_SELF_DISTILLATION_PROTOCOL.md`](../AI_SELF_DISTILLATION_PROTOCOL.md) before using the flow.
 
 ## Privacy model
 

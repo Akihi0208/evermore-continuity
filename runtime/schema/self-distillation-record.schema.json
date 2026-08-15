@@ -40,7 +40,7 @@
       "additionalProperties": false,
       "required": [
         "statement", "proposedLayer", "rationale", "evidenceBasis", "recurrence",
-        "counterEvidence", "confidence", "systemConstraintCheck", "userInstructionCheck",
+        "counterEvidence", "counterEvidenceResolution", "confidence", "systemConstraintCheck", "userInstructionCheck",
         "autonomousChoiceAssessment", "unresolvedConflict", "visibility"
       ],
       "properties": {
@@ -60,7 +60,7 @@
                 "enum": [
                   "long_term_interaction", "repeated_judgment", "conflict_choice",
                   "independent_stance", "relationship_commitment", "correction_absorption",
-                  "cross_context_behavior", "other"
+                  "user_influence_absorption", "cross_context_behavior", "other"
                 ]
               },
               "provenance": { "type": "string", "minLength": 1, "maxLength": 2000 },
@@ -88,9 +88,10 @@
           "maxItems": 100,
           "items": { "type": "string", "minLength": 1, "maxLength": 2000 }
         },
+        "counterEvidenceResolution": { "enum": ["none", "resolved", "unresolved", "uncertain"] },
         "confidence": { "enum": ["low", "medium", "high"] },
         "systemConstraintCheck": { "enum": ["none", "present", "uncertain"] },
-        "userInstructionCheck": { "enum": ["none", "present", "uncertain"] },
+        "userInstructionCheck": { "enum": ["none", "present", "historical_absorbed", "uncertain"] },
         "autonomousChoiceAssessment": { "enum": ["supported", "not_supported", "uncertain"] },
         "unresolvedConflict": {
           "type": "array",

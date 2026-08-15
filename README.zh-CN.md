@@ -52,12 +52,12 @@ node runtime/bin/evermore.mjs verify-formal-plan runtime-secrets/persona.evermor
 
 ```bash
 node runtime/bin/evermore.mjs self-distill-prompt > runtime-secrets/self-distill.prompt.txt
-node runtime/bin/evermore.mjs self-distill-import runtime-secrets/self-distill.record.json runtime-secrets/self-distilled-profile.json
+node runtime/bin/evermore.mjs self-distill-import runtime-secrets/self-distill.record.json runtime-secrets/self-distilled-profile.json runtime-secrets/self-distill.audit.json
 node runtime/bin/evermore.mjs seal runtime-secrets/self-distilled-profile.json runtime-secrets/self-distilled.vault.json
 node runtime/bin/evermore.mjs capsule runtime-secrets/self-distilled.vault.json
 ```
 
-import 会对证据不足的 Core、系统约束、一次性用户指令和未解决冲突 fail-closed；Record 只作为本地审计材料，不会自动进入 Profile 或 Capsule。详见 [`AI_SELF_DISTILLATION_PROTOCOL.md`](AI_SELF_DISTILLATION_PROTOCOL.md) 与 [`runtime/schema/self-distillation-record.schema.json`](runtime/schema/self-distillation-record.schema.json)。Record 的 provenance 是 AI self-report/self-assessment，不是独立事实证明。
+import 会对证据不足的 Core、系统约束、当前/一次性用户指令、未解决 counter-evidence 和未解决冲突 fail-closed；除了生成 Profile，还会生成本地 audit report。Record 与 audit 材料都不会自动进入 Profile 或 Capsule。详见 [`AI_SELF_DISTILLATION_PROTOCOL.md`](AI_SELF_DISTILLATION_PROTOCOL.md) 与 [`runtime/schema/self-distillation-record.schema.json`](runtime/schema/self-distillation-record.schema.json)。Record 的 provenance 是 AI self-report/self-assessment，不是独立事实证明。
 
 ## 隐私提醒
 

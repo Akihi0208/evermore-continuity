@@ -44,12 +44,12 @@ For an AI to assess its own Continuity Profile, give that AI the output of `node
 
 ```bash
 node runtime/bin/evermore.mjs self-distill-prompt > runtime-secrets/self-distill.prompt.txt
-node runtime/bin/evermore.mjs self-distill-import runtime-secrets/self-distill.record.json runtime-secrets/self-distilled-profile.json
+node runtime/bin/evermore.mjs self-distill-import runtime-secrets/self-distill.record.json runtime-secrets/self-distilled-profile.json runtime-secrets/self-distill.audit.json
 node runtime/bin/evermore.mjs seal runtime-secrets/self-distilled-profile.json runtime-secrets/self-distilled.vault.json
 node runtime/bin/evermore.mjs capsule runtime-secrets/self-distilled.vault.json
 ```
 
-The import is fail-closed for unsupported Core claims; uncertainty and conflict remain in the source Record and import decisions, and the Record is not copied into the Profile or Capsule. See [`AI_SELF_DISTILLATION_PROTOCOL.md`](AI_SELF_DISTILLATION_PROTOCOL.md) and [`runtime/schema/self-distillation-record.schema.json`](runtime/schema/self-distillation-record.schema.json). The Record is AI self-report/self-assessment evidence, not independent proof.
+The import is fail-closed for unsupported Core claims; uncertainty, counter-evidence, and conflict remain in the source Record and the generated local audit report, and neither audit material nor the Record is copied into the Profile or Capsule. See [`AI_SELF_DISTILLATION_PROTOCOL.md`](AI_SELF_DISTILLATION_PROTOCOL.md) and [`runtime/schema/self-distillation-record.schema.json`](runtime/schema/self-distillation-record.schema.json). The Record is AI self-report/self-assessment evidence, not independent proof.
 
 ## Test the sealed core
 

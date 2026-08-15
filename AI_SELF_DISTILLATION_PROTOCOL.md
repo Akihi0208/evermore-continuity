@@ -105,6 +105,7 @@ Boundary 记录 AI 在当前环境中的操作边界、拒绝条件、隐私约�
     "contexts": ["context-a", "context-b"]
   },
   "counterEvidence": [],
+  "counterEvidenceResolution": "none",
   "confidence": "high",
   "systemConstraintCheck": "none",
   "userInstructionCheck": "none",
@@ -121,6 +122,18 @@ Record 顶层还必须包含 `recordVersion`、带显式时区的 `createdAt`、
 `recordProvenance.kind` 必须是 `ai_self_report`。它说明“这是谁的自我评估”，
 不说明候选特征已经被外部独立证明。
 
+`userInstructionCheck` 需要区分四种情况：`none` 表示没有相关用户指令依赖；
+`present` 表示当前、单次或仍在直接驱动行为的用户指令；`historical_absorbed`
+表示历史上曾受用户影响，但后来在没有再次要求时仍跨上下文自主选择。最后一种
+不等于“非自主”，但必须有 `user_influence_absorption` 证据、跨上下文 recurrence
+和 `autonomousChoiceAssessment: supported`；`uncertain` 不能进入 Core。共同形成
+本身不是排除理由，重新依赖当前用户指令才是。
+
+如果 `counterEvidence` 非空，必须把 `counterEvidenceResolution` 明确写成
+`resolved`、`unresolved` 或 `uncertain`。`unresolved`/`uncertain` 的反例不能被
+静默忽略，import 会把候选降级或拒绝；`resolved` 也会在本地 audit report 中
+留下明确的自报处理记录。空的 `counterEvidence` 只能配 `none`。
+
 ## Import 的 fail-closed 规则
 
 本地 `self-distill-import` 只接受严格符合 schema 的 Record，并把通过审计的
@@ -128,9 +141,10 @@ Record 顶层还必须包含 `recordVersion`、带显式时区的 `createdAt`、
 也不会改变 Profile → Vault → Capsule → Host Request → Formal Validation 链。
 
 Core 候选至少需要高置信度、跨上下文重复证据、有效 provenance、
-`autonomousChoiceAssessment: supported`、无系统约束、无单次用户指令和空的
-`unresolvedConflict`。否则该候选只能被降级为 uncertain/excluded；如果没有
-任何合格 Core，import 必须失败。
+`autonomousChoiceAssessment: supported`、无系统约束、没有当前/单次用户指令依赖、
+没有未解决的 counter-evidence 和空的 `unresolvedConflict`。历史用户影响只有在
+明确的自主吸收证据存在时才可保留为 Core。否则该候选只能被降级为
+uncertain/excluded；如果没有任何合格 Core，import 必须失败。
 
 系统约束不得进入 Core。一次用户指令不得直接进入 Core。证据不足不得声称
 稳定 Core。未解决冲突不得静默固化。Boundary 候选可以进入现有 Profile 的

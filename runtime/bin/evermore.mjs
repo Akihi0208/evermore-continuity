@@ -59,7 +59,7 @@ Usage:
   evermore verify-formal-plan <validation-plan.json>
   evermore verify-formal <formal-result.json>
   evermore self-distill-prompt
-  evermore self-distill-import <record.json> [profile.json]
+  evermore self-distill-import <record.json> [profile.json] [audit-report.json]
   evermore doctor
 
 Passphrases must contain at least 12 characters. For non-interactive use, set
@@ -229,15 +229,19 @@ async function selfDistillPrompt() {
   stdout.write(await renderSelfDistillationPrompt());
 }
 
-async function selfDistillImport(recordPath, outputPath) {
+async function selfDistillImport(recordPath, outputPath, auditPath) {
   if (!recordPath) throw new Error("self-distill-import requires a Self-Distillation Record path");
   const { profile, report } = importSelfDistillationRecord(await loadPackage(recordPath));
-  const target = resolve(outputPath ?? `${recordPath.replace(/\.json$/i, "")}.profile.json`);
-  await writePrivateJson(target, profile);
+  const profileTarget = resolve(outputPath ?? `${recordPath.replace(/\.json$/i, "")}.profile.json`);
+  const auditTarget = resolve(auditPath ?? `${recordPath.replace(/\.json$/i, "")}.audit.json`);
+  await writePrivateJson(profileTarget, profile);
+  await writePrivateJson(auditTarget, report.auditReport);
   const accepted = report.decisions.filter((item) => item.status === "accepted").length;
   const downgraded = report.decisions.filter((item) => item.status === "downgraded").length;
-  stdout.write(`Self-Distillation Profile created: ${target}\n`);
-  stdout.write(`Accepted candidates: ${accepted}; downgraded/excluded candidates: ${downgraded}.\n`);
+  const excluded = report.decisions.filter((item) => item.status === "excluded").length;
+  stdout.write(`Self-Distillation Profile created: ${profileTarget}\n`);
+  stdout.write(`Self-Distillation audit report created: ${auditTarget}\n`);
+  stdout.write(`Accepted candidates: ${accepted}; downgraded: ${downgraded}; excluded: ${excluded}.\n`);
   stdout.write("Record provenance: AI self-report/self-assessment; not independent proof. Record was not copied into the Profile.\n");
   stdout.write("Review the generated Profile locally before sealing it into a Vault.\n");
 }
@@ -523,7 +527,7 @@ try {
   else if (command === "verify-formal-plan") await verifyValidationPlan(args[0]);
   else if (command === "verify-formal") await verifyFormalResult(args[0]);
   else if (command === "self-distill-prompt") await selfDistillPrompt();
-  else if (command === "self-distill-import") await selfDistillImport(args[0], args[1]);
+  else if (command === "self-distill-import") await selfDistillImport(args[0], args[1], args[2]);
   else if (command === "doctor") await doctor();
   else {
     process.stderr.write(`Unknown command: ${basename(command)}\n`);
