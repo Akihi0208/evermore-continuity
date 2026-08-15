@@ -49,4 +49,4 @@ This preview is an engine and verification layer, not a complete cross-model pro
 
 ## License
 
-No open-source license has been selected for this preview yet. Public testing and issue reporting are welcome; redistribution and modification terms will be stated before a stable release.
+Licensed under the [MIT License](LICENSE). You may use, copy, modify, merge, publish, distribute, sublicense, and sell copies of the software, provided that the copyright and license notice are retained.
