@@ -1,0 +1,17 @@
+{
+  "name": "@evermore-continuity/runtime",
+  "version": "0.4.0-alpha.1",
+  "description": "Offline personal runtime for creating encrypted continuity vaults and portable model-neutral handoff packages.",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=22"
+  },
+  "bin": {
+    "evermore": "./bin/evermore.mjs"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "check": "npm test"
+  }
+}
