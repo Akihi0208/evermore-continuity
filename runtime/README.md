@@ -13,7 +13,21 @@ No package installation or API key is required for the local Self-Distillation o
 
 ## Fastest path
 
-From the repository root:
+From the repository root, first create the ignored local working directory.
+
+Bash / zsh:
+
+```bash
+mkdir -p runtime-secrets
+```
+
+PowerShell:
+
+```powershell
+New-Item -ItemType Directory -Force runtime-secrets | Out-Null
+```
+
+Then run the same Node commands on either shell:
 
 ```bash
 node runtime/bin/evermore.mjs self-distill-prompt > runtime-secrets/self-distill.prompt.txt
@@ -21,15 +35,18 @@ node runtime/bin/evermore.mjs self-distill-prompt > runtime-secrets/self-distill
 # runtime-secrets/self-distill.record.json
 node runtime/bin/evermore.mjs self-distill-import runtime-secrets/self-distill.record.json runtime-secrets/self-distilled-profile.json runtime-secrets/self-distill.audit.json
 # Review runtime-secrets/self-distilled-profile.json locally.
-export EVERMORE_PASSPHRASE='use-a-long-unique-passphrase'
 node runtime/bin/evermore.mjs seal runtime-secrets/self-distilled-profile.json runtime-secrets/self-distilled.vault.json
 node runtime/bin/evermore.mjs capsule runtime-secrets/self-distilled.vault.json
 node runtime/bin/evermore.mjs verify-capsule runtime-secrets/self-distilled.vault.continuity-capsule.json
 node runtime/bin/evermore.mjs host-request runtime-secrets/self-distilled.vault.continuity-capsule.json
 node runtime/bin/evermore.mjs verify-host-request runtime-secrets/self-distilled.vault.host-request.json
 node runtime/bin/evermore.mjs host-prompt runtime-secrets/self-distilled.vault.host-request.json
-unset EVERMORE_PASSPHRASE
 ```
+
+`seal` prompts for the Vault passphrase interactively, so the default path does
+not depend on Bash-specific environment-variable syntax. For scripted or
+non-interactive use, set `EVERMORE_PASSPHRASE` using the conventions of your own
+shell and remove it from the process environment afterwards.
 
 The `capsule` command verifies the exact sealed artifact and its compiled runtime bridge before creating anything. The final command prints a model-neutral prompt. Review it, paste it into the AI host you want to test, and ask the host to return only the requested JSON. Save that reply as `observation.json`, then run:
 
@@ -167,7 +184,7 @@ The alpha.1 `export`, `verify-package`, and portable-package form of `prompt` re
 
 ## AI self-distillation
 
-The alpha.5 completeness patch provides the local-audit Self-Distillation path for the saved AI itself to propose a Profile. Give `self-distill-prompt` to the AI; it must return a Record from evidence it can actually see. Review the Record, import it, then continue through the existing seal → Vault → Capsule → Host Request → Formal Validation chain:
+The alpha.5 completeness patch provides the local-audit Self-Distillation path for the saved AI itself to propose a Profile. Give `self-distill-prompt` to the AI; it must return a Record from evidence it can actually see. Review the Record, import it, then continue through the existing seal → Vault → Capsule → Host Request → Formal Validation chain. Create `runtime-secrets/` first using the Bash/zsh or PowerShell command above if it does not already exist:
 
 ```bash
 node runtime/bin/evermore.mjs self-distill-prompt > runtime-secrets/self-distill.prompt.txt
