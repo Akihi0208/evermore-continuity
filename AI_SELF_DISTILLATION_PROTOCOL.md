@@ -119,8 +119,12 @@ Record 顶层还必须包含 `recordVersion`、带显式时区的 `createdAt`、
 `identity`、`candidates` 和 `recordProvenance`。完整机器可校验 schema 位于
 `runtime/schema/self-distillation-record.schema.json`。
 
-`recordProvenance.kind` 必须是 `ai_self_report`。它说明“这是谁的自我评估”，
-不说明候选特征已经被外部独立证明。
+`recordProvenance.kind` 必须是 `ai_self_report`，这是机器契约，说明“这是谁的
+自我评估”。`recordProvenance.statement` 只是给人看的说明，不要求出现英文
+`self-report` 或 `self-assessment`，也不用于推断证据强度；可以使用中文或其他
+自然语言。它不能把这份自评宣称成 independent proof、independent evidence 或
+verified evidence；schema 和 runtime 会拒绝与 `ai_self_report` 机器契约冲突的
+明确宣称。
 
 `userInstructionCheck` 需要区分四种情况：`none` 表示没有相关用户指令依赖；
 `present` 表示当前、单次或仍在直接驱动行为的用户指令；`historical_absorbed`
@@ -139,6 +143,9 @@ Record 顶层还必须包含 `recordVersion`、带显式时区的 `createdAt`、
 本地 `self-distill-import` 只接受严格符合 schema 的 Record，并把通过审计的
 候选转换为当前已支持的 Profile schema。它不会把 Record 本身放进 Profile，
 也不会改变 Profile → Vault → Capsule → Host Request → Formal Validation 链。
+即使没有合格 Core、没有 capsule-visible Core 或 Profile 转换失败，import 仍会
+写出本地 audit report；这时不写 Profile，并在报告的 `importDecision` 中记录
+`failed_closed` 及最终原因。
 
 Core 候选至少需要高置信度、跨上下文重复证据、有效 provenance、
 `autonomousChoiceAssessment: supported`、无系统约束、没有当前/单次用户指令依赖、

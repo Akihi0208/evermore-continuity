@@ -9,6 +9,7 @@ export const SELF_DISTILLATION_PROVENANCE = Object.freeze({
   kind: "ai_self_report",
   statement: "This record is an AI self-report/self-assessment artifact, not independent proof.",
 });
+export const EXPLICIT_PROVENANCE_CLAIM_PATTERN = "(?<!\\bnot\\s)(?<!\\bnot\\s+a\\s)(?<!\\bnot\\s+an\\s)(?<!不是)(?<!并非)(?<!不属于)(?:independent(?:ly)?\\s+(?:proof|evidence)|independent(?:ly)?\\s+verified(?:\\s+(?:evidence|proof|fact))?|verified\\s+evidence|独立(?:事实)?(?:证明|证据|验证)|(?:已(?:经)?验证)(?:的)?(?:证据|事实)?)";
 
 const MAX_TEXT_LENGTH = 2_000;
 const MAX_ITEMS = 100;
@@ -52,6 +53,16 @@ const ALLOWED_CANDIDATE_FIELDS = new Set([
 const ALLOWED_EVIDENCE_FIELDS = new Set(["kind", "provenance", "description"]);
 const ALLOWED_RECURRENCE_FIELDS = new Set(["count", "crossContext", "contexts"]);
 const ALLOWED_PROVENANCE_FIELDS = new Set(["kind", "statement"]);
+const EXPLICIT_PROVENANCE_CLAIM = new RegExp(EXPLICIT_PROVENANCE_CLAIM_PATTERN, "iu");
+
+export class SelfDistillationImportError extends Error {
+  constructor(message, auditReport, decisions) {
+    super(message);
+    this.name = "SelfDistillationImportError";
+    this.auditReport = auditReport;
+    this.decisions = decisions;
+  }
+}
 
 function evidenceLooksInvisible(provenance, description) {
   return /(not visible|not seen|cannot see|can't see|not provided|not available|看不到|未提供|没有看到|无法看到|推测|猜测|i assume|probably)/i.test(
@@ -186,13 +197,8 @@ export function validateSelfDistillationRecord(input) {
     throw new TypeError("recordProvenance.kind must be ai_self_report");
   }
   const provenanceStatement = text(input.recordProvenance.statement, "recordProvenance.statement");
-  const nonIndependentStatement = provenanceStatement.replace(
-    /\b(?:not|isn't|is not)\s+independent(?:ly)?\s+(?:proof|fact|verification|verified|evidence)\b/gi,
-    "",
-  ).replace(/(?:不是|并非|不属于)\s*独立(?:事实)?(?:证明|证据|验证)/g, "");
-  if (!/(?:self[- ]report|self[- ]assessment)/i.test(provenanceStatement) ||
-      /(?:independent(?:ly)?\s+(?:proof|fact|verification|verified)|independent evidence|独立(?:事实)?(?:证明|证据|验证)|已(?:经)?验证)/i.test(nonIndependentStatement)) {
-    throw new TypeError("recordProvenance.statement must preserve self-report/self-assessment semantics");
+  if (EXPLICIT_PROVENANCE_CLAIM.test(provenanceStatement)) {
+    throw new TypeError("recordProvenance.statement must not claim independent proof or verified evidence");
   }
   const recordProvenance = {
     kind: input.recordProvenance.kind,
@@ -340,6 +346,7 @@ function createAuditReport(record, decisions) {
     identity: record.identity,
     recordProvenance: record.recordProvenance,
     recordRetainedSeparately: true,
+    importDecision: { status: "pending", reasons: [] },
     decisions: decisions.map((item) => ({
       index: item.index,
       statement: item.statement,
@@ -352,6 +359,13 @@ function createAuditReport(record, decisions) {
   };
 }
 
+function finalizeAuditReport(auditReport, status, reasons = []) {
+  return {
+    ...auditReport,
+    importDecision: { status, reasons },
+  };
+}
+
 export function importSelfDistillationRecord(input) {
   const record = validateSelfDistillationRecord(input);
   const decisions = record.candidates.map(decision);
@@ -360,23 +374,49 @@ export function importSelfDistillationRecord(input) {
   const acceptedTexture = decisions.filter((item) => item.acceptedLayer === "texture");
   const acceptedBoundaries = decisions.filter((item) => item.acceptedLayer === "boundary");
   if (acceptedCore.length === 0) {
-    throw new Error("Self-Distillation import failed closed: no evidence-qualified Core candidate");
+    const failedAuditReport = finalizeAuditReport(auditReport, "failed_closed", [
+      "no_evidence_qualified_core_candidate",
+    ]);
+    throw new SelfDistillationImportError(
+      "Self-Distillation import failed closed: no evidence-qualified Core candidate",
+      failedAuditReport,
+      decisions,
+    );
   }
   const coreCandidates = acceptedCore.map((item) => record.candidates[item.index]);
   if (!coreCandidates.some((candidate) => candidate.visibility === "capsule")) {
-    throw new Error("Self-Distillation import failed closed: no capsule-visible Core candidate");
+    const failedAuditReport = finalizeAuditReport(auditReport, "failed_closed", [
+      "no_capsule_visible_core_candidate",
+    ]);
+    throw new SelfDistillationImportError(
+      "Self-Distillation import failed closed: no capsule-visible Core candidate",
+      failedAuditReport,
+      decisions,
+    );
   }
   const textureCandidates = acceptedTexture.map((item) => record.candidates[item.index]);
-  const profile = normalizeProfile({
-    createdAt: record.createdAt,
-    identity: record.identity,
-    anchors: {
-      core: coreCandidates.map((candidate) => ({ statement: candidate.statement, visibility: candidate.visibility })),
-      texture: textureCandidates.map((candidate) => ({ statement: candidate.statement, visibility: candidate.visibility })),
-    },
-    boundaries: [...new Set(acceptedBoundaries.map((item) => item.statement))],
-    privateNotes: [],
-  }, record.createdAt);
+  let profile;
+  try {
+    profile = normalizeProfile({
+      createdAt: record.createdAt,
+      identity: record.identity,
+      anchors: {
+        core: coreCandidates.map((candidate) => ({ statement: candidate.statement, visibility: candidate.visibility })),
+        texture: textureCandidates.map((candidate) => ({ statement: candidate.statement, visibility: candidate.visibility })),
+      },
+      boundaries: [...new Set(acceptedBoundaries.map((item) => item.statement))],
+      privateNotes: [],
+    }, record.createdAt);
+  } catch (error) {
+    const failedAuditReport = finalizeAuditReport(auditReport, "failed_closed", [
+      "profile_normalization_failed",
+    ]);
+    throw new SelfDistillationImportError(
+      `Self-Distillation import failed closed: ${error instanceof Error ? error.message : String(error)}`,
+      failedAuditReport,
+      decisions,
+    );
+  }
   return {
     profile,
     report: {
@@ -384,7 +424,7 @@ export function importSelfDistillationRecord(input) {
       recordProvenance: "ai_self_report / self_assessment; not independent proof",
       recordRetainedSeparately: true,
       decisions,
-      auditReport,
+      auditReport: finalizeAuditReport(auditReport, "accepted"),
     },
   };
 }

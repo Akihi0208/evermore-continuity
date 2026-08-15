@@ -30,7 +30,14 @@
       "required": ["kind", "statement"],
       "properties": {
         "kind": { "const": "ai_self_report" },
-        "statement": { "type": "string", "minLength": 1, "maxLength": 2000 }
+        "statement": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000,
+          "not": {
+            "pattern": "(?<!\\bnot\\s)(?<!\\bnot\\s+a\\s)(?<!\\bnot\\s+an\\s)(?<!不是)(?<!并非)(?<!不属于)(?:independent(?:ly)?\\s+(?:proof|evidence)|independent(?:ly)?\\s+verified(?:\\s+(?:evidence|proof|fact))?|verified\\s+evidence|独立(?:事实)?(?:证明|证据|验证)|(?:已(?:经)?验证)(?:的)?(?:证据|事实)?)"
+          }
+        }
       }
     }
   },

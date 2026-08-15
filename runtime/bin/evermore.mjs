@@ -28,6 +28,7 @@ import { runOpenAIFormalValidation } from "../src/adapters/openai-formal-validat
 import {
   importSelfDistillationRecord,
   renderSelfDistillationPrompt,
+  SelfDistillationImportError,
 } from "../src/self-distillation.mjs";
 
 const DEFAULT_VAULT = resolve("runtime-secrets", "persona.evermore-vault.json");
@@ -231,9 +232,23 @@ async function selfDistillPrompt() {
 
 async function selfDistillImport(recordPath, outputPath, auditPath) {
   if (!recordPath) throw new Error("self-distill-import requires a Self-Distillation Record path");
-  const { profile, report } = importSelfDistillationRecord(await loadPackage(recordPath));
   const profileTarget = resolve(outputPath ?? `${recordPath.replace(/\.json$/i, "")}.profile.json`);
   const auditTarget = resolve(auditPath ?? `${recordPath.replace(/\.json$/i, "")}.audit.json`);
+  let imported;
+  try {
+    imported = importSelfDistillationRecord(await loadPackage(recordPath));
+  } catch (error) {
+    if (!(error instanceof SelfDistillationImportError)) throw error;
+    await writePrivateJson(auditTarget, error.auditReport);
+    const accepted = error.decisions.filter((item) => item.status === "accepted").length;
+    const downgraded = error.decisions.filter((item) => item.status === "downgraded").length;
+    const excluded = error.decisions.filter((item) => item.status === "excluded").length;
+    stdout.write(`Self-Distillation audit report created: ${auditTarget}\n`);
+    stdout.write(`Accepted candidates: ${accepted}; downgraded: ${downgraded}; excluded: ${excluded}.\n`);
+    stdout.write("No Profile was written because Self-Distillation import failed closed.\n");
+    throw error;
+  }
+  const { profile, report } = imported;
   await writePrivateJson(profileTarget, profile);
   await writePrivateJson(auditTarget, report.auditReport);
   const accepted = report.decisions.filter((item) => item.status === "accepted").length;

@@ -6,9 +6,11 @@ import { join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import {
+  EXPLICIT_PROVENANCE_CLAIM_PATTERN,
   importSelfDistillationRecord,
   renderSelfDistillationPrompt,
   SELF_DISTILLATION_RECORD_VERSION,
+  SelfDistillationImportError,
   validateSelfDistillationRecord,
 } from "../src/self-distillation.mjs";
 import { createVault, openVault } from "../src/vault.mjs";
@@ -116,6 +118,37 @@ test("system constraints cannot become Core", () => {
     () => importSelfDistillationRecord(record([candidate({ systemConstraintCheck: "present" })])),
     /no evidence-qualified Core candidate/,
   );
+});
+
+test("failed Core import preserves a complete failed-closed audit report", () => {
+  let failure;
+  try {
+    importSelfDistillationRecord(record([
+      candidate({
+        statement: "This candidate lacks enough recurrence.",
+        confidence: "medium",
+      }),
+      candidate({
+        statement: "Keep this excluded until evidence improves.",
+        proposedLayer: "uncertain",
+      }),
+      candidate({
+        statement: "Do not cross the current platform boundary.",
+        proposedLayer: "boundary",
+        visibility: "local",
+        autonomousChoiceAssessment: "uncertain",
+      }),
+    ]));
+  } catch (error) {
+    failure = error;
+  }
+  assert.ok(failure instanceof SelfDistillationImportError);
+  assert.equal(failure.auditReport.importDecision.status, "failed_closed");
+  assert.deepEqual(failure.auditReport.importDecision.reasons, ["no_evidence_qualified_core_candidate"]);
+  assert.deepEqual(failure.auditReport.decisions.map((item) => item.status), ["downgraded", "excluded", "accepted"]);
+  assert.deepEqual(failure.auditReport.decisions[0].reasons, ["core_requires_high_confidence"]);
+  assert.deepEqual(failure.auditReport.decisions[1].reasons, ["candidate_marked_uncertain"]);
+  assert.ok(Array.isArray(failure.auditReport.decisions[2].sourceSummary.evidenceBasis));
 });
 
 test("one-off user instruction cannot become Core", () => {
@@ -239,12 +272,26 @@ test("shared timestamp validation rejects a Date.parse-normalized invalid calend
   assert.throws(() => validateSelfDistillationRecord(input), /explicit timezone/);
 });
 
-test("record provenance cannot be relabeled as independent proof", () => {
+test("provenance schema and runtime accept Chinese self-assessment without English keywords", async () => {
+  const input = record();
+  input.recordProvenance.statement = "这是一份中文自我评估记录，只代表模型自述，不是独立事实证明。";
+  assert.doesNotThrow(() => validateSelfDistillationRecord(input));
+  const schema = JSON.parse(await readFile(
+    new URL("../schema/self-distillation-record.schema.json", import.meta.url),
+    "utf8",
+  ));
+  assert.equal(
+    schema.properties.recordProvenance.properties.statement.not.pattern,
+    EXPLICIT_PROVENANCE_CLAIM_PATTERN,
+  );
+});
+
+test("record provenance cannot claim independent proof or verified evidence", () => {
   const input = record();
   input.recordProvenance.statement = "This is independently verified evidence.";
-  assert.throws(() => validateSelfDistillationRecord(input), /self-report\/self-assessment semantics/);
+  assert.throws(() => validateSelfDistillationRecord(input), /must not claim independent proof/);
   input.recordProvenance.statement = "这是独立事实证明，也是 self-report。";
-  assert.throws(() => validateSelfDistillationRecord(input), /self-report\/self-assessment semantics/);
+  assert.throws(() => validateSelfDistillationRecord(input), /must not claim independent proof/);
 });
 
 test("the prompt contains the full protocol and strict JSON-only instruction", async () => {
@@ -291,6 +338,26 @@ test("CLI prompt and import commands are usable without changing the existing Pr
   assert.deepEqual(audit.decisions[2].reasons, ["candidate_marked_uncertain"]);
   assert.ok(Array.isArray(audit.decisions[0].sourceSummary.evidenceBasis));
   assert.match(importResult.stdout, /Accepted candidates: 1; downgraded: 1; excluded: 1\./);
+});
+
+test("CLI writes audit report when import fails closed and does not write a Profile", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "evermore-self-distill-failed-cli-"));
+  const recordPath = join(directory, "failed-record.json");
+  await writeFile(recordPath, `${JSON.stringify(record([
+    candidate({ confidence: "medium" }),
+    candidate({ proposedLayer: "uncertain" }),
+    candidate({ proposedLayer: "boundary", visibility: "local", autonomousChoiceAssessment: "uncertain" }),
+  ]), null, 2)}\n`, { mode: 0o600 });
+  const importResult = await runCli(["self-distill-import", recordPath], directory);
+  assert.equal(importResult.code, 1);
+  const audit = JSON.parse(await readFile(join(directory, "failed-record.audit.json"), "utf8"));
+  assert.equal(audit.importDecision.status, "failed_closed");
+  assert.deepEqual(audit.importDecision.reasons, ["no_evidence_qualified_core_candidate"]);
+  assert.deepEqual(audit.decisions.map((item) => item.status), ["downgraded", "excluded", "accepted"]);
+  assert.deepEqual(audit.decisions[0].reasons, ["core_requires_high_confidence"]);
+  assert.match(importResult.stdout, /No Profile was written because Self-Distillation import failed closed\./);
+  assert.match(importResult.stderr, /no evidence-qualified Core candidate/);
+  await assert.rejects(readFile(join(directory, "failed-record.profile.json"), "utf8"), { code: "ENOENT" });
 });
 
 test("sealed core and artifact hashes remain unchanged", async () => {

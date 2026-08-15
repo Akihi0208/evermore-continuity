@@ -49,7 +49,7 @@ node runtime/bin/evermore.mjs seal runtime-secrets/self-distilled-profile.json r
 node runtime/bin/evermore.mjs capsule runtime-secrets/self-distilled.vault.json
 ```
 
-The import is fail-closed for unsupported Core claims; uncertainty, counter-evidence, and conflict remain in the source Record and the generated local audit report, and neither audit material nor the Record is copied into the Profile or Capsule. See [`AI_SELF_DISTILLATION_PROTOCOL.md`](AI_SELF_DISTILLATION_PROTOCOL.md) and [`runtime/schema/self-distillation-record.schema.json`](runtime/schema/self-distillation-record.schema.json). The Record is AI self-report/self-assessment evidence, not independent proof.
+The import is fail-closed for unsupported Core claims; uncertainty, counter-evidence, and conflict remain in the source Record and the generated local audit report. The audit report is written even when import fails closed (with no Profile written), and neither audit material nor the Record is copied into the Profile or Capsule. See [`AI_SELF_DISTILLATION_PROTOCOL.md`](AI_SELF_DISTILLATION_PROTOCOL.md) and [`runtime/schema/self-distillation-record.schema.json`](runtime/schema/self-distillation-record.schema.json). The Record is AI self-report/self-assessment evidence, not independent proof.
 
 ## Test the sealed core
 

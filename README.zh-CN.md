@@ -57,7 +57,7 @@ node runtime/bin/evermore.mjs seal runtime-secrets/self-distilled-profile.json r
 node runtime/bin/evermore.mjs capsule runtime-secrets/self-distilled.vault.json
 ```
 
-import 会对证据不足的 Core、系统约束、当前/一次性用户指令、未解决 counter-evidence 和未解决冲突 fail-closed；除了生成 Profile，还会生成本地 audit report。Record 与 audit 材料都不会自动进入 Profile 或 Capsule。详见 [`AI_SELF_DISTILLATION_PROTOCOL.md`](AI_SELF_DISTILLATION_PROTOCOL.md) 与 [`runtime/schema/self-distillation-record.schema.json`](runtime/schema/self-distillation-record.schema.json)。Record 的 provenance 是 AI self-report/self-assessment，不是独立事实证明。
+import 会对证据不足的 Core、系统约束、当前/一次性用户指令、未解决 counter-evidence 和未解决冲突 fail-closed；除了生成 Profile，还会生成本地 audit report。即使 fail-closed，audit report 也会保留逐条决定和最终原因，此时不会写入 Profile。Record 与 audit 材料都不会自动进入 Profile 或 Capsule。详见 [`AI_SELF_DISTILLATION_PROTOCOL.md`](AI_SELF_DISTILLATION_PROTOCOL.md) 与 [`runtime/schema/self-distillation-record.schema.json`](runtime/schema/self-distillation-record.schema.json)。Record 的 provenance 是 AI self-report/self-assessment，不是独立事实证明。
 
 ## 隐私提醒
 
