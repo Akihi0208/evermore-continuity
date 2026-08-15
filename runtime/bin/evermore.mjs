@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { chmod, readFile, writeFile } from "node:fs/promises";
-import { basename, dirname, resolve } from "node:path";
+import { basename, resolve } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { stdin, stdout } from "node:process";
 import { createPortablePackage, normalizeProfile, verifyPortablePackage } from "../src/profile.mjs";

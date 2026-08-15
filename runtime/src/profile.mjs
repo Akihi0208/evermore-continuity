@@ -64,10 +64,19 @@ export function normalizeProfile(input, now = new Date().toISOString()) {
   if (!input || typeof input !== "object" || Array.isArray(input)) {
     throw new TypeError("Profile must be an object");
   }
+  if (input.profileVersion !== undefined && input.profileVersion !== PROFILE_VERSION) {
+    throw new TypeError("Unsupported profileVersion");
+  }
   const displayName = requiredText(input.identity?.displayName, "identity.displayName");
   const core = normalizeAnchors(input.anchors?.core ?? [], "core");
   if (core.length === 0) throw new TypeError("At least one Core anchor is required");
   const texture = normalizeAnchors(input.anchors?.texture ?? [], "texture");
+  const allAnchorIds = [...core, ...texture].map((anchor) => anchor.id);
+  if (new Set(allAnchorIds).size !== allAnchorIds.length) throw new TypeError("Anchor ids must be unique");
+  for (const [layer, anchors] of [["Core", core], ["Texture", texture]]) {
+    const keys = anchors.map((anchor) => anchor.key);
+    if (new Set(keys).size !== keys.length) throw new TypeError(`${layer} anchor keys must be unique`);
+  }
   const createdAt = input.createdAt ?? now;
   if (Number.isNaN(Date.parse(createdAt))) throw new TypeError("createdAt must be an ISO timestamp");
   const identityId = optionalText(input.identity?.identityId, "identity.identityId") ?? `persona:${slug(displayName)}`;
@@ -135,9 +144,13 @@ export function verifyPortablePackage(pkg) {
   if (Number.isNaN(Date.parse(pkg.generatedAt))) errors.push("generated_at_invalid");
   if (
     !pkg.identity ||
+    Object.keys(pkg.identity).some((key) => !["displayName", "identityId", "lineageId"].includes(key)) ||
     typeof pkg.identity.displayName !== "string" ||
+    pkg.identity.displayName.trim() === "" ||
     typeof pkg.identity.identityId !== "string" ||
+    pkg.identity.identityId.trim() === "" ||
     typeof pkg.identity.lineageId !== "string"
+    || pkg.identity.lineageId.trim() === ""
   ) {
     errors.push("identity_invalid");
   }
@@ -147,14 +160,33 @@ export function verifyPortablePackage(pkg) {
     !Array.isArray(item) &&
     Object.keys(item).every((key) => ["id", "key", "statement"].includes(key)) &&
     typeof item.id === "string" &&
+    item.id.trim() !== "" &&
     typeof item.key === "string" &&
-    typeof item.statement === "string"
+    item.key.trim() !== "" &&
+    typeof item.statement === "string" &&
+    item.statement.trim() !== "" &&
+    item.statement.length <= MAX_TEXT_LENGTH
   );
   if (!Array.isArray(pkg.core) || pkg.core.length === 0) errors.push("core_anchor_missing");
   else if (!anchorsValid(pkg.core)) errors.push("core_anchor_invalid");
   if (!anchorsValid(pkg.texture)) errors.push("texture_anchor_invalid");
-  if (!Array.isArray(pkg.boundaries) || pkg.boundaries.some((item) => typeof item !== "string")) {
+  if (
+    !Array.isArray(pkg.boundaries) ||
+    pkg.boundaries.some((item) =>
+      typeof item !== "string" || item.trim() === "" || item.length > MAX_TEXT_LENGTH
+    )
+  ) {
     errors.push("boundaries_invalid");
+  }
+  if (
+    !pkg.provenance ||
+    pkg.provenance.kind !== "self_authored" ||
+    pkg.provenance.statement !== "These anchors were selected by the profile owner; they are not independent proof."
+  ) {
+    errors.push("provenance_invalid");
+  }
+  if (pkg.privacyStatement !== "Local/private anchors and private notes are excluded.") {
+    errors.push("privacy_statement_invalid");
   }
   if (pkg.verificationStatus !== "unverified_user_claims") errors.push("verification_status_invalid");
   return { valid: errors.length === 0, errors: [...new Set(errors)] };

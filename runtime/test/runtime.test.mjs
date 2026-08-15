@@ -97,3 +97,20 @@ test("a profile requires at least one Core anchor", () => {
     /At least one Core anchor/,
   );
 });
+
+test("profiles reject unsupported versions and duplicate anchors", () => {
+  assert.throws(() => normalizeProfile({ ...input, profileVersion: "future" }), /Unsupported profileVersion/);
+  const duplicate = structuredClone(input);
+  duplicate.anchors.core[1].key = duplicate.anchors.core[0].key;
+  assert.throws(() => normalizeProfile(duplicate), /Core anchor keys must be unique/);
+});
+
+test("portable packages cannot promote their own provenance", () => {
+  const pkg = createPortablePackage(input, "2026-08-15T01:00:00.000Z");
+  pkg.provenance.statement = "Independently verified.";
+  const { packageHash: _oldHash, ...body } = pkg;
+  pkg.packageHash = sha256(body);
+  const result = verifyPortablePackage(pkg);
+  assert.equal(result.valid, false);
+  assert.match(result.errors.join(","), /provenance_invalid/);
+});
