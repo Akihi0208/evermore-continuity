@@ -6,6 +6,7 @@ runtime-secrets/
 runtime-evidence/
 *.evermore-vault.json
 *.portable.json
+*.continuity-capsule.json
 *.handoff.md
 *.pem
 *.key

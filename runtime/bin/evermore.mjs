@@ -5,20 +5,25 @@ import { createInterface } from "node:readline/promises";
 import { stdin, stdout } from "node:process";
 import { createPortablePackage, normalizeProfile, verifyPortablePackage } from "../src/profile.mjs";
 import { createVault, openVault, readVault, writeVault } from "../src/vault.mjs";
-import { renderHostHandoff } from "../src/handoff.mjs";
+import { createCoreCapsuleEnvelope, verifyCoreCapsuleEnvelope } from "../src/core-bridge.mjs";
+import { verifySealedCoreBridge } from "../src/core-integrity.mjs";
+import { renderCoreCapsuleHandoff, renderHostHandoff } from "../src/handoff.mjs";
 
 const DEFAULT_VAULT = resolve("runtime-secrets", "persona.evermore-vault.json");
 
 function usage(exitCode = 0) {
-  const message = `Evermore Continuity Personal Runtime 0.4 alpha
+  const message = `Evermore Continuity Personal Runtime 0.4.0-alpha.2
 
 Usage:
   evermore init [vault-path]
   evermore seal <profile.json> [vault-path]
   evermore export <vault-path> [portable-package.json]
+  evermore capsule <vault-path> [continuity-capsule.json]
   evermore verify <vault-path>
   evermore verify-package <portable-package.json>
-  evermore prompt <portable-package.json>
+  evermore verify-capsule <continuity-capsule.json> [expected-lineage]
+  evermore prompt <portable-package-or-capsule.json>
+  evermore doctor
 
 Passphrases must contain at least 12 characters. For non-interactive use, set
 EVERMORE_PASSPHRASE in the process environment; never commit it to a file.
@@ -128,6 +133,22 @@ async function exportPackage(vaultPath, outputPath) {
   stdout.write("Review it before sending. Local/private anchors and private notes were excluded.\n");
 }
 
+async function writePrivateJson(target, value) {
+  await writeFile(target, `${JSON.stringify(value, null, 2)}\n`, { mode: 0o600, flag: "wx" });
+  await chmod(target, 0o600);
+}
+
+async function createCapsule(vaultPath, outputPath) {
+  if (!vaultPath) throw new Error("capsule requires a vault path");
+  const profile = await open(vaultPath);
+  const envelope = await createCoreCapsuleEnvelope(profile);
+  const target = resolve(outputPath ?? `${vaultPath.replace(/\.json$/i, "")}.continuity-capsule.json`);
+  await writePrivateJson(target, envelope);
+  stdout.write(`Continuity Capsule created: ${target}\n`);
+  stdout.write("Sealed-core and Capsule integrity passed locally. Host verification has not run.\n");
+  stdout.write("Review it before sending. Local/private anchors and private notes were excluded.\n");
+}
+
 async function verifyVault(path) {
   if (!path) throw new Error("verify requires a vault path");
   await open(path);
@@ -135,7 +156,7 @@ async function verifyVault(path) {
 }
 
 async function loadPackage(path) {
-  if (!path) throw new Error("A portable package path is required");
+  if (!path) throw new Error("A portable package or Continuity Capsule path is required");
   return JSON.parse(await readFile(resolve(path), "utf8"));
 }
 
@@ -145,8 +166,27 @@ async function verifyPackage(path) {
   stdout.write("Portable package valid. Hash and required fields passed.\n");
 }
 
+async function verifyCapsule(path, expectedLineageId) {
+  if (!path) throw new Error("verify-capsule requires a Continuity Capsule path");
+  const result = await verifyCoreCapsuleEnvelope(await loadPackage(path), {
+    ...(expectedLineageId ? { expectedLineageId } : {}),
+  });
+  if (!result.valid) throw new Error(`Continuity Capsule invalid: ${result.errors.join(", ")}`);
+  stdout.write("Sealed-core artifact, bridge, envelope, and Capsule integrity passed.\n");
+  stdout.write("Host verification status: not_run.\n");
+}
+
+async function doctor() {
+  const result = await verifySealedCoreBridge();
+  if (!result.valid) throw new Error(`Sealed core bridge invalid: ${result.errors.join(", ")}`);
+  stdout.write(`Sealed core bridge valid: @shenwu/continuity@${result.coreVersion}\n`);
+  stdout.write(`Artifact SHA-256: ${result.artifactSha256}\n`);
+}
+
 async function prompt(path) {
-  stdout.write(renderHostHandoff(await loadPackage(path)));
+  const input = await loadPackage(path);
+  if (input.envelopeVersion) stdout.write(await renderCoreCapsuleHandoff(input));
+  else stdout.write(renderHostHandoff(input));
 }
 
 const [command, ...args] = process.argv.slice(2);
@@ -155,9 +195,12 @@ try {
   else if (command === "init") await init(args[0]);
   else if (command === "seal") await seal(args[0], args[1]);
   else if (command === "export") await exportPackage(args[0], args[1]);
+  else if (command === "capsule") await createCapsule(args[0], args[1]);
   else if (command === "verify") await verifyVault(args[0]);
   else if (command === "verify-package") await verifyPackage(args[0]);
+  else if (command === "verify-capsule") await verifyCapsule(args[0], args[1]);
   else if (command === "prompt") await prompt(args[0]);
+  else if (command === "doctor") await doctor();
   else {
     process.stderr.write(`Unknown command: ${basename(command)}\n`);
     usage(1);
