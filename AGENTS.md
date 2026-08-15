@@ -2,7 +2,7 @@
 
 ## Goal
 
-Help the user run the Personal Runtime without treating the repository as an automatic memory product. The usable alpha creates an encrypted local vault, generates a reviewed sealed-core Continuity Capsule, and renders a model-neutral handoff.
+Help the user run the Personal Runtime without treating the repository as an automatic memory product. The usable alpha creates an encrypted local vault, generates a reviewed sealed-core Continuity Capsule, and can package a receiving host's response as an integrity-bound but unverified receipt.
 
 ## Safe setup
 
@@ -12,6 +12,8 @@ Help the user run the Personal Runtime without treating the repository as an aut
 4. The user must enter the vault passphrase locally. Never ask them to paste a passphrase, API key, cookie, raw chat export, or private profile into a chat.
 5. Generate with `node runtime/bin/evermore.mjs capsule runtime-secrets/persona.evermore-vault.json`.
 6. Verify with `verify-capsule`, render the handoff, and ask the user to review the visible contents before sending it to another model.
+7. Prefer the offline `host-request` → `host-prompt` → `host-wrap` path. A Host Request and Host Receipt are unencrypted and must be reviewed before sharing.
+8. Use `host-run-openai` only when the user explicitly chooses network execution, supplies the model name, and accepts that one API request may incur a charge. Never add `--allow-network` on the user's behalf.
 
 For non-interactive automation, the user may set `EVERMORE_PASSPHRASE` locally in the process environment. Do not write it to a repository file, command transcript, issue, or pull request.
 
@@ -22,5 +24,7 @@ For non-interactive automation, the user may set `EVERMORE_PASSPHRASE` locally i
 - Do not bypass or weaken the sealed-artifact and vendored-bridge hash checks.
 - Do not import raw chats. Public examples and tests must remain synthetic.
 - Do not claim that `ready` means `verified`, that a handoff creates automatic cross-session memory, or that this project proves consciousness or subjective sameness.
+- A valid Host Receipt means only that the request, transport metadata, and structured observation are internally consistent. Its status must remain `observed_unverified`.
+- Never ask for or store an OpenAI API key. The optional adapter reads `OPENAI_API_KEY` from the user's local process, sends exactly one request to the fixed Responses endpoint, requests `store: false`, and performs no retry.
 - Missing, masked, stale, conflicting, or unavailable material must never be presented as recovered.
 - A locally valid Capsule must still say host verification has not run.

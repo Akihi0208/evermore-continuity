@@ -8,11 +8,19 @@ import { createVault, openVault, readVault, writeVault } from "../src/vault.mjs"
 import { createCoreCapsuleEnvelope, verifyCoreCapsuleEnvelope } from "../src/core-bridge.mjs";
 import { verifySealedCoreBridge } from "../src/core-integrity.mjs";
 import { renderCoreCapsuleHandoff, renderHostHandoff } from "../src/handoff.mjs";
+import {
+  createHostRequest,
+  renderHostRequestPrompt,
+  verifyHostReceipt,
+  verifyHostRequest,
+} from "../src/host-contract.mjs";
+import { createManualHostReceipt, importManualHostResult } from "../src/adapters/manual.mjs";
+import { runOpenAIResponsesAdapter } from "../src/adapters/openai-responses.mjs";
 
 const DEFAULT_VAULT = resolve("runtime-secrets", "persona.evermore-vault.json");
 
 function usage(exitCode = 0) {
-  const message = `Evermore Continuity Personal Runtime 0.4.0-alpha.2
+  const message = `Evermore Continuity Personal Runtime 0.4.0-alpha.3
 
 Usage:
   evermore init [vault-path]
@@ -23,6 +31,13 @@ Usage:
   evermore verify-package <portable-package.json>
   evermore verify-capsule <continuity-capsule.json> [expected-lineage]
   evermore prompt <portable-package-or-capsule.json>
+  evermore host-request <continuity-capsule.json> [host-request.json]
+  evermore host-prompt <host-request.json>
+  evermore host-wrap <host-request.json> <observation.json> <provider> <model> [host-receipt.json]
+  evermore host-import <host-request.json> <manual-result.json> [host-receipt.json]
+  evermore host-run-openai <host-request.json> <model> [host-receipt.json] --allow-network [--reasoning=medium]
+  evermore verify-host-request <host-request.json>
+  evermore verify-host <host-receipt.json>
   evermore doctor
 
 Passphrases must contain at least 12 characters. For non-interactive use, set
@@ -127,8 +142,7 @@ async function exportPackage(vaultPath, outputPath) {
   const profile = await open(vaultPath);
   const pkg = createPortablePackage(profile);
   const target = resolve(outputPath ?? `${vaultPath.replace(/\.json$/i, "")}.portable.json`);
-  await writeFile(target, `${JSON.stringify(pkg, null, 2)}\n`, { mode: 0o600, flag: "wx" });
-  await chmod(target, 0o600);
+  await writePrivateJson(target, pkg);
   stdout.write(`Portable package created: ${target}\n`);
   stdout.write("Review it before sending. Local/private anchors and private notes were excluded.\n");
 }
@@ -189,6 +203,116 @@ async function prompt(path) {
   else stdout.write(renderHostHandoff(input));
 }
 
+async function createRequest(capsulePath, outputPath) {
+  if (!capsulePath) throw new Error("host-request requires a Continuity Capsule path");
+  const request = await createHostRequest(await loadPackage(capsulePath));
+  const defaultPath = /\.continuity-capsule\.json$/i.test(capsulePath)
+    ? capsulePath.replace(/\.continuity-capsule\.json$/i, ".host-request.json")
+    : capsulePath.replace(/\.json$/i, ".host-request.json");
+  const target = resolve(outputPath ?? defaultPath);
+  await writePrivateJson(target, request);
+  stdout.write(`Offline Host Request created: ${target}\n`);
+  stdout.write("Network status: not used. Host verification status: not_run.\n");
+}
+
+async function hostPrompt(path) {
+  if (!path) throw new Error("host-prompt requires a Host Request path");
+  stdout.write(await renderHostRequestPrompt(await loadPackage(path)));
+}
+
+async function verifyRequest(path) {
+  if (!path) throw new Error("verify-host-request requires a Host Request path");
+  const result = await verifyHostRequest(await loadPackage(path));
+  if (!result.valid) throw new Error(`Host Request invalid: ${result.errors.join(", ")}`);
+  stdout.write("Host Request valid. Capsule, prompt, policy, and request integrity passed.\n");
+  stdout.write("Network status: not used. Host verification status: not_run.\n");
+}
+
+function defaultReceiptPath(requestPath) {
+  return /\.host-request\.json$/i.test(requestPath)
+    ? requestPath.replace(/\.host-request\.json$/i, ".host-receipt.json")
+    : requestPath.replace(/\.json$/i, ".host-receipt.json");
+}
+
+async function importHostResult(requestPath, resultPath, outputPath) {
+  if (!requestPath || !resultPath) {
+    throw new Error("host-import requires a Host Request and manual result path");
+  }
+  const receipt = await importManualHostResult(
+    await loadPackage(requestPath),
+    await loadPackage(resultPath),
+  );
+  const target = resolve(outputPath ?? defaultReceiptPath(requestPath));
+  await writePrivateJson(target, receipt);
+  stdout.write(`Manual Host Receipt created: ${target}\n`);
+  stdout.write("Host verification status: observed_unverified.\n");
+}
+
+async function wrapHostObservation(requestPath, observationPath, provider, model, outputPath) {
+  if (!requestPath || !observationPath || !provider || !model) {
+    throw new Error("host-wrap requires a Host Request, observation, provider, and model");
+  }
+  const receipt = await createManualHostReceipt(
+    await loadPackage(requestPath),
+    await loadPackage(observationPath),
+    { provider, model },
+  );
+  const target = resolve(outputPath ?? defaultReceiptPath(requestPath));
+  await writePrivateJson(target, receipt);
+  stdout.write(`Manual Host Receipt created: ${target}\n`);
+  stdout.write("Host verification status: observed_unverified.\n");
+}
+
+function parseOpenAIOptions(args) {
+  const allowNetwork = args.includes("--allow-network");
+  const reasoningOptions = args.filter((item) => item.startsWith("--reasoning="));
+  const unknownFlags = args.filter((item) => item.startsWith("--") &&
+    item !== "--allow-network" && !item.startsWith("--reasoning="));
+  if (reasoningOptions.length > 1 || unknownFlags.length > 0) {
+    throw new Error("host-run-openai received invalid options");
+  }
+  const positional = args.filter((item) => !item.startsWith("--"));
+  return {
+    requestPath: positional[0],
+    model: positional[1],
+    outputPath: positional[2],
+    allowNetwork,
+    reasoning: reasoningOptions[0]?.slice("--reasoning=".length) ?? "medium",
+  };
+}
+
+async function runOpenAI(args) {
+  const options = parseOpenAIOptions(args);
+  if (!options.requestPath || !options.model) {
+    throw new Error("host-run-openai requires a Host Request path and explicit model");
+  }
+  if (!options.allowNetwork) {
+    throw new Error("host-run-openai requires --allow-network because it may incur API charges");
+  }
+  if (!process.env.OPENAI_API_KEY) {
+    throw new Error("Set OPENAI_API_KEY locally before OpenAI execution");
+  }
+  stdout.write(`Executing exactly one OpenAI Responses API request with model ${options.model}.\n`);
+  const receipt = await runOpenAIResponsesAdapter(await loadPackage(options.requestPath), {
+    model: options.model,
+    reasoning: options.reasoning,
+    allowNetwork: true,
+    apiKey: process.env.OPENAI_API_KEY,
+  });
+  const target = resolve(options.outputPath ?? defaultReceiptPath(options.requestPath));
+  await writePrivateJson(target, receipt);
+  stdout.write(`OpenAI Host Receipt created: ${target}\n`);
+  stdout.write("Host verification status: observed_unverified.\n");
+}
+
+async function verifyReceipt(path) {
+  if (!path) throw new Error("verify-host requires a Host Receipt path");
+  const result = await verifyHostReceipt(await loadPackage(path));
+  if (!result.valid) throw new Error(`Host Receipt invalid: ${result.errors.join(", ")}`);
+  stdout.write("Host Receipt valid. Request binding, transport metadata, observation, and receipt hash passed.\n");
+  stdout.write("Host verification status: observed_unverified.\n");
+}
+
 const [command, ...args] = process.argv.slice(2);
 try {
   if (!command || command === "help" || command === "--help" || command === "-h") usage();
@@ -200,6 +324,13 @@ try {
   else if (command === "verify-package") await verifyPackage(args[0]);
   else if (command === "verify-capsule") await verifyCapsule(args[0], args[1]);
   else if (command === "prompt") await prompt(args[0]);
+  else if (command === "host-request") await createRequest(args[0], args[1]);
+  else if (command === "host-prompt") await hostPrompt(args[0]);
+  else if (command === "host-wrap") await wrapHostObservation(args[0], args[1], args[2], args[3], args[4]);
+  else if (command === "host-import") await importHostResult(args[0], args[1], args[2]);
+  else if (command === "host-run-openai") await runOpenAI(args);
+  else if (command === "verify-host-request") await verifyRequest(args[0]);
+  else if (command === "verify-host") await verifyReceipt(args[0]);
   else if (command === "doctor") await doctor();
   else {
     process.stderr.write(`Unknown command: ${basename(command)}\n`);
