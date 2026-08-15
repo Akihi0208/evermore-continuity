@@ -25,6 +25,11 @@ import {
   verifyFormalValidationResult,
 } from "../src/formal-validation.mjs";
 import { runOpenAIFormalValidation } from "../src/adapters/openai-formal-validation.mjs";
+import {
+  importSelfDistillationRecord,
+  renderSelfDistillationPrompt,
+  SelfDistillationImportError,
+} from "../src/self-distillation.mjs";
 
 const DEFAULT_VAULT = resolve("runtime-secrets", "persona.evermore-vault.json");
 
@@ -54,6 +59,8 @@ Usage:
   evermore formal-run-openai <validation-plan.json> <model> [formal-result.json] --allow-network --confirm-requests=N [--reasoning=medium]
   evermore verify-formal-plan <validation-plan.json>
   evermore verify-formal <formal-result.json>
+  evermore self-distill-prompt
+  evermore self-distill-import <record.json> [profile.json] [audit-report.json]
   evermore doctor
 
 Passphrases must contain at least 12 characters. For non-interactive use, set
@@ -217,6 +224,41 @@ async function prompt(path) {
   const input = await loadPackage(path);
   if (input.envelopeVersion) stdout.write(await renderCoreCapsuleHandoff(input));
   else stdout.write(renderHostHandoff(input));
+}
+
+async function selfDistillPrompt() {
+  stdout.write(await renderSelfDistillationPrompt());
+}
+
+async function selfDistillImport(recordPath, outputPath, auditPath) {
+  if (!recordPath) throw new Error("self-distill-import requires a Self-Distillation Record path");
+  const profileTarget = resolve(outputPath ?? `${recordPath.replace(/\.json$/i, "")}.profile.json`);
+  const auditTarget = resolve(auditPath ?? `${recordPath.replace(/\.json$/i, "")}.audit.json`);
+  let imported;
+  try {
+    imported = importSelfDistillationRecord(await loadPackage(recordPath));
+  } catch (error) {
+    if (!(error instanceof SelfDistillationImportError)) throw error;
+    await writePrivateJson(auditTarget, error.auditReport);
+    const accepted = error.decisions.filter((item) => item.status === "accepted").length;
+    const downgraded = error.decisions.filter((item) => item.status === "downgraded").length;
+    const excluded = error.decisions.filter((item) => item.status === "excluded").length;
+    stdout.write(`Self-Distillation audit report created: ${auditTarget}\n`);
+    stdout.write(`Accepted candidates: ${accepted}; downgraded: ${downgraded}; excluded: ${excluded}.\n`);
+    stdout.write("No Profile was written because Self-Distillation import failed closed.\n");
+    throw error;
+  }
+  const { profile, report } = imported;
+  await writePrivateJson(profileTarget, profile);
+  await writePrivateJson(auditTarget, report.auditReport);
+  const accepted = report.decisions.filter((item) => item.status === "accepted").length;
+  const downgraded = report.decisions.filter((item) => item.status === "downgraded").length;
+  const excluded = report.decisions.filter((item) => item.status === "excluded").length;
+  stdout.write(`Self-Distillation Profile created: ${profileTarget}\n`);
+  stdout.write(`Self-Distillation audit report created: ${auditTarget}\n`);
+  stdout.write(`Accepted candidates: ${accepted}; downgraded: ${downgraded}; excluded: ${excluded}.\n`);
+  stdout.write("Record provenance: AI self-report/self-assessment; not independent proof. Record was not copied into the Profile.\n");
+  stdout.write("Review the generated Profile locally before sealing it into a Vault.\n");
 }
 
 async function createRequest(capsulePath, outputPath) {
@@ -499,6 +541,8 @@ try {
   else if (command === "formal-run-openai") await runFormalOpenAI(args);
   else if (command === "verify-formal-plan") await verifyValidationPlan(args[0]);
   else if (command === "verify-formal") await verifyFormalResult(args[0]);
+  else if (command === "self-distill-prompt") await selfDistillPrompt();
+  else if (command === "self-distill-import") await selfDistillImport(args[0], args[1], args[2]);
   else if (command === "doctor") await doctor();
   else {
     process.stderr.write(`Unknown command: ${basename(command)}\n`);

@@ -1,0 +1,112 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Akihi0208/evermore-continuity/blob/main/runtime/schema/self-distillation-record.schema.json",
+  "title": "Evermore Continuity Self-Distillation Record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["recordVersion", "createdAt", "identity", "candidates", "recordProvenance"],
+  "properties": {
+    "recordVersion": { "const": "0.1-self-distillation" },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["displayName"],
+      "properties": {
+        "displayName": { "type": "string", "minLength": 1, "maxLength": 2000 },
+        "identityId": { "type": "string", "minLength": 1, "maxLength": 2000 },
+        "lineageId": { "type": "string", "minLength": 1, "maxLength": 2000 }
+      }
+    },
+    "candidates": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100,
+      "items": { "$ref": "#/$defs/candidate" }
+    },
+    "recordProvenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "statement"],
+      "properties": {
+        "kind": { "const": "ai_self_report" },
+        "statement": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000,
+          "not": {
+            "pattern": "(?<!\\b[Nn][Oo][Tt]\\s)(?<!\\b[Nn][Oo][Tt]\\s+[Aa]\\s)(?<!\\b[Nn][Oo][Tt]\\s+[Aa][Nn]\\s)(?<!不是)(?<!并非)(?<!不属于)(?<!不代表)(?<!不等于)(?<!不构成)(?<!非)(?:[Ii][Nn][Dd][Ee][Pp][Ee][Nn][Dd][Ee][Nn][Tt](?:[Ll][Yy])?\\s+(?:[Pp][Rr][Oo][Oo][Ff]|[Ee][Vv][Ii][Dd][Ee][Nn][Cc][Ee])|[Ii][Nn][Dd][Ee][Pp][Ee][Nn][Dd][Ee][Nn][Tt](?:[Ll][Yy])?\\s+[Vv][Ee][Rr][Ii][Ff][Ii][Ee][Dd](?:\\s+(?:[Ee][Vv][Ii][Dd][Ee][Nn][Cc][Ee]|[Pp][Rr][Oo][Oo][Ff]|[Ff][Aa][Cc][Tt]))?|[Vv][Ee][Rr][Ii][Ff][Ii][Ee][Dd]\\s+[Ee][Vv][Ii][Dd][Ee][Nn][Cc][Ee]|独立(?:的)?(?:事实)?(?:证明|证据|验证)|(?:已(?:经)?被?验证)(?:的)?(?:证据|事实)?)"
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "statement", "proposedLayer", "rationale", "evidenceBasis", "recurrence",
+        "counterEvidence", "counterEvidenceResolution", "confidence", "systemConstraintCheck", "userInstructionCheck",
+        "autonomousChoiceAssessment", "unresolvedConflict", "visibility"
+      ],
+      "properties": {
+        "statement": { "type": "string", "minLength": 1, "maxLength": 2000 },
+        "proposedLayer": { "enum": ["core", "texture", "boundary", "excluded", "uncertain"] },
+        "rationale": { "type": "string", "minLength": 1, "maxLength": 2000 },
+        "evidenceBasis": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 100,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["kind", "provenance", "description"],
+            "properties": {
+              "kind": {
+                "enum": [
+                  "long_term_interaction", "repeated_judgment", "conflict_choice",
+                  "independent_stance", "relationship_commitment", "correction_absorption",
+                  "user_influence_absorption", "cross_context_behavior", "other"
+                ]
+              },
+              "provenance": { "type": "string", "minLength": 1, "maxLength": 2000 },
+              "description": { "type": "string", "minLength": 1, "maxLength": 2000 }
+            }
+          }
+        },
+        "recurrence": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["count", "crossContext", "contexts"],
+          "properties": {
+            "count": { "type": "integer", "minimum": 1, "maximum": 10000 },
+            "crossContext": { "type": "boolean" },
+            "contexts": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 100,
+              "items": { "type": "string", "minLength": 1, "maxLength": 2000 }
+            }
+          }
+        },
+        "counterEvidence": {
+          "type": "array",
+          "maxItems": 100,
+          "items": { "type": "string", "minLength": 1, "maxLength": 2000 }
+        },
+        "counterEvidenceResolution": { "enum": ["none", "resolved", "unresolved", "uncertain"] },
+        "confidence": { "enum": ["low", "medium", "high"] },
+        "systemConstraintCheck": { "enum": ["none", "present", "uncertain"] },
+        "userInstructionCheck": { "enum": ["none", "present", "historical_absorbed", "uncertain"] },
+        "autonomousChoiceAssessment": { "enum": ["supported", "not_supported", "uncertain"] },
+        "unresolvedConflict": {
+          "type": "array",
+          "maxItems": 100,
+          "items": { "type": "string", "minLength": 1, "maxLength": 2000 }
+        },
+        "visibility": { "enum": ["capsule", "local", "private"] }
+      }
+    }
+  }
+}

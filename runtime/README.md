@@ -150,6 +150,20 @@ Run `node runtime/bin/evermore.mjs doctor` to check the sealed artifact and ever
 
 The alpha.1 `export`, `verify-package`, and portable-package form of `prompt` remain supported for compatibility. New testing should use `capsule` and `verify-capsule`.
 
+## AI self-distillation
+
+The alpha.5 completeness patch adds a separate, local-audit path for the saved AI itself to propose a Profile. Give `self-distill-prompt` to the AI; it must return a Record from evidence it can actually see. Review the Record, import it, then continue through the existing seal → Vault → Capsule → Host Request → Formal Validation chain:
+
+```bash
+node runtime/bin/evermore.mjs self-distill-prompt > runtime-secrets/self-distill.prompt.txt
+node runtime/bin/evermore.mjs self-distill-import runtime-secrets/self-distill.record.json runtime-secrets/self-distilled-profile.json runtime-secrets/self-distill.audit.json
+# Review runtime-secrets/self-distilled-profile.json locally.
+node runtime/bin/evermore.mjs seal runtime-secrets/self-distilled-profile.json runtime-secrets/self-distilled.vault.json
+node runtime/bin/evermore.mjs capsule runtime-secrets/self-distilled.vault.json
+```
+
+`self-distill-import` strictly validates the Self-Distillation Record schema, writes only the existing Profile shape, and writes a separate local audit report containing every candidate decision, reason, and source summary. The audit report is also written when import fails closed, with `importDecision.status: "failed_closed"`; no Profile is written in that case. The Record remains AI self-report/self-assessment evidence, not independent proof. Import fails closed when a candidate has insufficient evidence for Core, is actually a system/platform constraint, is still directly driven by a user instruction, has unresolved counter-evidence, or has unresolved conflict. It never copies the Record, its rationale, recurrence, or provenance into a Capsule. The Profile provenance remains `self_authored`: a self-report selection, not independent proof. Read [`../AI_SELF_DISTILLATION_PROTOCOL.md`](../AI_SELF_DISTILLATION_PROTOCOL.md) before using the flow.
+
 ## Privacy model
 
 - Vaults use `scrypt` plus AES-256-GCM with a random salt and nonce.

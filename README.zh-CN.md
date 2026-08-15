@@ -46,6 +46,19 @@ node runtime/bin/evermore.mjs verify-formal-plan runtime-secrets/persona.evermor
 
 正式结果中的 `verified` 表示：提供的 load evidence 通过，且全部关键 probes 中由模型声明的 action ID 经本地 deterministic classification 后落入允许的 sealed outcome，并带有所需的声明引用。它不表示 action 本身已经被独立验证。`renderedText` 只保留作人工检查，当前版本不判断它与 action 的语义是否一致。这个结果不等于自动跨会话记忆，也不证明意识或主观同一性。
 
+## AI 自我提炼（alpha.5 completeness patch）
+
+如果要让被保存的 AI 自己判断 Continuity Profile，先运行 `node runtime/bin/evermore.mjs self-distill-prompt`，把完整输出交给自己的 AI。AI 只能依据自己实际看得到的长期证据，返回严格的 Self-Distillation Record。先在本地审阅 Record，再导入当前 Profile schema：
+
+```bash
+node runtime/bin/evermore.mjs self-distill-prompt > runtime-secrets/self-distill.prompt.txt
+node runtime/bin/evermore.mjs self-distill-import runtime-secrets/self-distill.record.json runtime-secrets/self-distilled-profile.json runtime-secrets/self-distill.audit.json
+node runtime/bin/evermore.mjs seal runtime-secrets/self-distilled-profile.json runtime-secrets/self-distilled.vault.json
+node runtime/bin/evermore.mjs capsule runtime-secrets/self-distilled.vault.json
+```
+
+import 会对证据不足的 Core、系统约束、当前/一次性用户指令、未解决 counter-evidence 和未解决冲突 fail-closed；除了生成 Profile，还会生成本地 audit report。即使 fail-closed，audit report 也会保留逐条决定和最终原因，此时不会写入 Profile。Record 与 audit 材料都不会自动进入 Profile 或 Capsule。详见 [`AI_SELF_DISTILLATION_PROTOCOL.md`](AI_SELF_DISTILLATION_PROTOCOL.md) 与 [`runtime/schema/self-distillation-record.schema.json`](runtime/schema/self-distillation-record.schema.json)。Record 的 provenance 是 AI self-report/self-assessment，不是独立事实证明。
+
 ## 隐私提醒
 
 - 不要上传原始聊天记录。
