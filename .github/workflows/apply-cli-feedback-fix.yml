@@ -1,0 +1,212 @@
+name: Apply CLI feedback fix
+
+on:
+  push:
+    branches:
+      - fix/cli-feedback-20260818
+
+permissions:
+  contents: write
+
+jobs:
+  patch-test-commit:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/cli-feedback-20260818
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: core/package-lock.json
+      - name: Apply focused CLI fixes
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('runtime/bin/evermore.mjs')
+          text = path.read_text()
+
+          def replace_once(old, new, label):
+              global text
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'{label}: expected exactly one match, found {count}')
+              text = text.replace(old, new, 1)
+
+          replace_once(
+              'import { chmod, readFile, writeFile } from "node:fs/promises";',
+              'import { access, chmod, readFile, writeFile } from "node:fs/promises";',
+              'fs import',
+          )
+
+          replace_once(
+              r'''async function passphraseForNewVault() {
+  const first = await secretPrompt("Vault passphrase: ");
+  if (!process.env.EVERMORE_PASSPHRASE) {
+    const second = await secretPrompt("Repeat passphrase: ");
+    if (first !== second) throw new Error("Passphrases do not match");
+  }
+  return first;
+}''',
+              r'''async function passphraseForNewVault() {
+  stdout.write("Vault passphrase requirement: at least 12 characters.\n");
+  const first = await secretPrompt("Vault passphrase (minimum 12 characters): ");
+  if (!process.env.EVERMORE_PASSPHRASE) {
+    const second = await secretPrompt("Repeat passphrase (minimum 12 characters): ");
+    if (first !== second) throw new Error("Passphrases do not match");
+  }
+  return first;
+}''',
+              'passphrase prompt',
+          )
+
+          replace_once(
+              r'''async function writePrivateJson(target, value) {
+  await writeFile(target, `${JSON.stringify(value, null, 2)}\n`, { mode: 0o600, flag: "wx" });
+  await chmod(target, 0o600);
+}''',
+              r'''function overwriteRefusal(target) {
+  return new Error(`Refusing to overwrite existing file: ${target}. Choose a different output path or move/remove the existing file.`);
+}
+
+async function ensureOutputAvailable(target) {
+  try {
+    await access(target);
+  } catch (error) {
+    if (error?.code === "ENOENT") return;
+    throw error;
+  }
+  throw overwriteRefusal(target);
+}
+
+async function writePrivateJson(target, value) {
+  try {
+    await writeFile(target, `${JSON.stringify(value, null, 2)}\n`, { mode: 0o600, flag: "wx" });
+  } catch (error) {
+    if (error?.code === "EEXIST") throw overwriteRefusal(target);
+    throw error;
+  }
+  await chmod(target, 0o600);
+}''',
+              'private JSON writer',
+          )
+
+          replace_once(
+              r'''async function selfDistillImport(recordPath, outputPath, auditPath) {
+  if (!recordPath) throw new Error("self-distill-import requires a Self-Distillation Record path");
+  const profileTarget = resolve(outputPath ?? `${recordPath.replace(/\.json$/i, "")}.profile.json`);
+  const auditTarget = resolve(auditPath ?? `${recordPath.replace(/\.json$/i, "")}.audit.json`);
+  let imported;''',
+              r'''async function selfDistillImport(recordPath, outputPath, auditPath) {
+  if (!recordPath) throw new Error("self-distill-import requires a Self-Distillation Record path");
+  const profileTarget = resolve(outputPath ?? `${recordPath.replace(/\.json$/i, "")}.profile.json`);
+  const auditTarget = resolve(auditPath ?? `${recordPath.replace(/\.json$/i, "")}.audit.json`);
+  await ensureOutputAvailable(auditTarget);
+  let imported;''',
+              'self-distill audit preflight',
+          )
+
+          replace_once(
+              r'''  const { profile, report } = imported;
+  await writePrivateJson(profileTarget, profile);''',
+              r'''  const { profile, report } = imported;
+  await ensureOutputAvailable(profileTarget);
+  await writePrivateJson(profileTarget, profile);''',
+              'self-distill profile preflight',
+          )
+
+          path.write_text(text)
+          PY
+
+          cat > runtime/test/cli-feedback.test.mjs <<'EOF'
+          import assert from "node:assert/strict";
+          import { mkdtemp, readFile, writeFile } from "node:fs/promises";
+          import { spawn } from "node:child_process";
+          import { tmpdir } from "node:os";
+          import { join } from "node:path";
+          import test from "node:test";
+          import { fileURLToPath } from "node:url";
+
+          const CLI_PATH = fileURLToPath(new URL("../bin/evermore.mjs", import.meta.url));
+          const SYNTHETIC_PROFILE = fileURLToPath(new URL("../examples/synthetic-profile.json", import.meta.url));
+
+          function runCli(args, cwd, env = {}) {
+            return new Promise((resolve, reject) => {
+              const child = spawn(process.execPath, [CLI_PATH, ...args], {
+                cwd,
+                env: { ...process.env, ...env },
+              });
+              let stdout = "";
+              let stderr = "";
+              child.stdout.setEncoding("utf8");
+              child.stderr.setEncoding("utf8");
+              child.stdout.on("data", (chunk) => { stdout += chunk; });
+              child.stderr.on("data", (chunk) => { stderr += chunk; });
+              child.once("error", reject);
+              child.once("close", (code, signal) => resolve({ code, signal, stdout, stderr }));
+            });
+          }
+
+          test("seal announces the 12-character passphrase requirement before creating a vault", async () => {
+            const directory = await mkdtemp(join(tmpdir(), "evermore-seal-feedback-"));
+            const vaultPath = join(directory, "persona.evermore-vault.json");
+            const result = await runCli(
+              ["seal", SYNTHETIC_PROFILE, vaultPath],
+              directory,
+              { EVERMORE_PASSPHRASE: "synthetic-seal-passphrase" },
+            );
+            assert.equal(result.code, 0, result.stderr);
+            assert.match(result.stdout, /Vault passphrase requirement: at least 12 characters\./);
+            assert.match(result.stdout, /Encrypted vault created:/);
+          });
+
+          test("self-distill-import reports an actionable non-overwrite error instead of raw EEXIST", async () => {
+            const directory = await mkdtemp(join(tmpdir(), "evermore-import-feedback-"));
+            const recordPath = join(directory, "record.json");
+            const profilePath = join(directory, "record.profile.json");
+            const auditPath = join(directory, "record.audit.json");
+            await writeFile(recordPath, "{}\n", { mode: 0o600 });
+            await writeFile(auditPath, "keep-existing-audit\n", { mode: 0o600 });
+
+            const result = await runCli(
+              ["self-distill-import", recordPath, profilePath, auditPath],
+              directory,
+            );
+
+            assert.equal(result.code, 1);
+            assert.match(result.stderr, /Refusing to overwrite existing file:/);
+            assert.match(result.stderr, /Choose a different output path or move\/remove the existing file\./);
+            assert.doesNotMatch(result.stderr, /EEXIST/);
+            assert.equal(await readFile(auditPath, "utf8"), "keep-existing-audit\n");
+            await assert.rejects(readFile(profilePath, "utf8"), { code: "ENOENT" });
+          });
+          EOF
+
+      - name: Install sealed-core development dependencies
+        working-directory: core
+        run: npm ci
+      - name: Run Personal Runtime tests in UTC
+        env:
+          TZ: UTC
+        run: node --test runtime/test/*.test.mjs
+      - name: Run Personal Runtime tests in Asia/Shanghai
+        env:
+          TZ: Asia/Shanghai
+        run: node --test runtime/test/*.test.mjs
+      - name: Run sealed core checks
+        working-directory: core
+        run: npm run check
+      - name: Commit tested fix and remove temporary runner
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/apply-cli-feedback-fix.yml
+          git add runtime/bin/evermore.mjs runtime/test/cli-feedback.test.mjs
+          git commit -m "fix(runtime): clarify CLI collisions and passphrase requirement"
+          git push origin HEAD:fix/cli-feedback-20260818
